@@ -1,0 +1,1536 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#1B7FAE">
+<title>القبطان</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="القبطان">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* القبطان: ألوان البحر والذهب، حواف ٢٠، نقشة نجمة البوصلة، فاتح وداكن حسب النظام */
+:root{
+  --bg-outer:#E9F1F4; --bg:#F4F9FB; --surface:#FFFFFF; --surface-2:#EAF4F8; --line:#C9DDE5;
+  --fg:#10303D; --fg-2:#4B6874;
+  --primary:#1B7FAE; --on-primary:#FFFFFF; --primary-soft:#D8EEF6;
+  --band-1:#CFEAF5; --band-2:#E3F3F9;
+  --gold:#C9962B; --gold-soft:#F7EBCB; --gold-ink:#6B4A06;
+  --danger:#A63B2E; --danger-soft:#F6DDD8;
+  --pat:rgba(27,127,174,.24); --shadow:0 6px 20px rgba(16,48,61,.08); --scrim:rgba(8,24,31,.5);
+  --font:'Cairo','IBM Plex Sans Arabic',system-ui,sans-serif;
+  --r:20px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg-outer:#06141A; --bg:#0B1B23; --surface:#122732; --surface-2:#173341; --line:#27414E;
+    --fg:#E6F3F8; --fg-2:#9DB8C4;
+    --primary:#58BFE3; --on-primary:#06222D; --primary-soft:#173B4A;
+    --band-1:#123241; --band-2:#0E2630;
+    --gold:#E0B04A; --gold-soft:#3A2F14; --gold-ink:#F0CF85;
+    --danger:#F0A090; --danger-soft:#3D1F1A;
+    --pat:rgba(88,191,227,.22); --shadow:0 6px 20px rgba(0,0,0,.35); --scrim:rgba(0,0,0,.6);
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg-outer);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.6;direction:rtl;text-align:right;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+a{color:inherit;text-decoration:none}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.g{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.pl{stroke:var(--pat);fill:none;stroke-width:1}
+.pat{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.pat~*{position:relative}
+
+.app{max-width:480px;margin:0 auto;background:var(--bg);min-height:100vh;min-height:100dvh;position:relative;padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+.app.notabs{padding-bottom:32px}
+
+/* هيدر الرئيسية */
+.band{position:relative;padding-top:calc(16px + env(safe-area-inset-top,0px));padding-bottom:14px;background:linear-gradient(var(--band-1),var(--band-2));border-radius:0 0 var(--r) var(--r);z-index:5}
+.band .pat{-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
+.search{position:relative;display:flex;align-items:center;gap:10px;height:54px;padding:0 16px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r)}
+.search:focus-within{border-color:var(--primary)}
+.search .ic{color:var(--primary)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;height:100%;font-size:15px;text-align:right}
+.search input::placeholder{color:var(--fg-2)}
+.search input::-webkit-search-cancel-button,.search input::-webkit-search-decoration{-webkit-appearance:none;appearance:none;display:none}
+.search .clr{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;color:var(--fg-2)}
+.search .clr .ic{width:18px;height:18px;color:inherit}
+.locked .search{opacity:.55;pointer-events:none}
+.meta-row{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+.loc{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px}
+.loc .ic{width:20px;height:20px;color:var(--primary)}
+.brand{display:flex;align-items:center;gap:6px;font-weight:800;font-size:14px;color:var(--gold-ink);white-space:nowrap}
+.brand .ic{width:18px;height:18px;color:var(--gold)}
+
+/* الاقتراحات */
+.sugg{position:absolute;top:calc(16px + env(safe-area-inset-top,0px) + 54px + 8px);right:max(16px,env(safe-area-inset-right,0px));left:max(16px,env(safe-area-inset-left,0px));background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:8px;max-height:60vh;overflow-y:auto;z-index:30}
+.sugg h4{margin:8px 10px 4px;font-size:12px;font-weight:700;color:var(--fg-2)}
+.sg{display:flex;align-items:center;gap:12px;width:100%;padding:10px;border-radius:14px;text-align:right}
+.sg:hover,.sg:focus-visible{background:var(--surface-2)}
+.sg .t{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--primary-soft);color:var(--primary);flex:none}
+.sg .t .ic{width:22px;height:22px}
+.sg .n{display:block;font-weight:700;font-size:14px;line-height:1.3}
+.sg .s{font-size:12px;color:var(--fg-2)}
+.sg-empty{padding:12px 10px;color:var(--fg-2);font-size:13px}
+
+/* شريط خفيف ورسائل */
+.note{padding-top:14px}
+.ridecard{display:flex;align-items:center;gap:14px;width:100%;margin-top:14px;padding:14px 16px;background:var(--gold-soft);border:1.5px solid var(--gold);border-radius:var(--r);color:var(--fg);text-align:right}
+.ridecard .ic{width:36px;height:36px;flex:none;color:var(--gold-ink)}
+.ridecard b{display:block;font-size:16px;line-height:1.4}
+.ridecard span{font-size:13px;color:var(--fg-2);line-height:1.6}
+.note p{margin:0;padding:8px 14px;border-radius:var(--r);background:var(--gold-soft);color:var(--gold-ink);font-size:13px;font-weight:600;text-align:center}
+
+/* أنواع المحلات */
+.cats{display:flex;gap:10px;overflow-x:auto;padding-top:16px;padding-bottom:6px;scroll-snap-type:x proximity;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cat{display:flex;flex-direction:column;align-items:center;gap:8px;width:78px;flex:none;scroll-snap-align:start}
+.cat .box{position:relative;display:grid;place-items:center;width:60px;height:60px;border-radius:var(--r);background:var(--surface);border:1.5px solid var(--line);color:var(--primary)}
+.cat .lbl{font-size:12px;line-height:1.35;text-align:center;font-weight:600;min-height:2.7em}
+.cat[aria-pressed="true"] .box{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.cat[aria-pressed="true"] .box::after{content:"";position:absolute;bottom:-7px;width:18px;height:4px;border-radius:4px;background:var(--gold)}
+.cat[aria-pressed="true"] .lbl{color:var(--primary);font-weight:800}
+
+/* عناوين الأقسام */
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-top:18px;padding-bottom:10px}
+.sec-head h2{margin:0;font-size:20px;line-height:1.3;font-weight:800}
+.sec-head span{font-size:12px;color:var(--fg-2)}
+.list{display:flex;flex-direction:column;gap:12px}
+.card{position:relative;display:flex;align-items:stretch;gap:14px;width:100%;padding:12px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);text-align:right;transition:border-color .15s}
+.card:hover{border-color:var(--primary)}
+.card.flash{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.thumb{position:relative;display:grid;place-items:center;width:76px;min-height:76px;border-radius:14px;background:var(--primary-soft);color:var(--primary);overflow:hidden;flex:none}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.thumb .ic{position:relative;width:32px;height:32px}
+.thumb.sq{width:80px;height:80px;min-height:80px}
+.body{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1;justify-content:center}
+.body .nm{font-size:16px;font-weight:700;line-height:1.3}
+.body .sc{font-size:12px;color:var(--fg-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--surface-2);color:var(--fg)}
+.chip .ic{width:14px;height:14px}
+.chip.t{background:var(--gold-soft);color:var(--gold-ink)}
+
+/* حالات */
+.deny{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:20px;padding:28px 20px;text-align:center;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);overflow:hidden}
+.deny .pat{opacity:.5}
+.deny .big{display:grid;place-items:center;width:64px;height:64px;border-radius:var(--r);background:var(--gold-soft);color:var(--gold-ink)}
+.deny .big .ic{width:32px;height:32px}
+.deny h2{margin:0;font-size:22px;font-weight:800}
+.deny p{margin:0;color:var(--fg-2);max-width:34ch}
+.spin{width:36px;height:36px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--primary);animation:sp 1s linear infinite;margin:40px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.empty{padding:24px 16px;text-align:center;color:var(--fg-2);line-height:1.8}
+
+/* أزرار */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;border-radius:var(--r);font-weight:700;font-size:15px;border:1.5px solid var(--primary)}
+.btn .ic{width:20px;height:20px}
+.btn.p{background:var(--primary);color:var(--on-primary)}
+.btn.s{background:transparent;color:var(--primary)}
+.btn.d{background:transparent;color:var(--danger);border-color:var(--danger)}
+.btn.block{display:flex;width:100%}
+.btn[disabled]{opacity:.6;cursor:default}
+
+/* الجملة التشجيعية */
+.cheer{padding-top:22px}
+.cheer .in{position:relative;padding:26px 20px;border-radius:var(--r);background:var(--gold-soft);border:1.5px solid var(--gold);text-align:center;overflow:hidden}
+.cheer .pat{opacity:.5}
+.cheer h3{margin:0;font-size:22px;line-height:1.9;font-weight:800;color:var(--gold-ink)}
+.cheer p{margin:6px 0 0;color:var(--gold-ink);opacity:.9;font-size:13px}
+
+/* هيدر الشاشات الداخلية */
+.hdr{position:relative;padding:calc(8px + env(safe-area-inset-top,0px)) 8px 16px;background:linear-gradient(var(--band-1),var(--band-2));border-radius:0 0 var(--r) var(--r);overflow:hidden}
+.hdr .pat{-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)}
+.hdr-top{position:relative;display:flex;align-items:center;gap:4px}
+.back{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;flex:none}
+.hdr h1{margin:0;font-size:22px;font-weight:800;line-height:1.3;min-width:0}
+.hdr .sub{position:relative;padding:0 12px;font-size:13px;color:var(--fg-2)}
+.hdr .chips{position:relative;padding:10px 12px 0}
+.adm{display:flex;flex-wrap:wrap;gap:8px;padding-top:14px}
+.adm .btn{min-height:40px;padding:0 14px;font-size:13px}
+
+/* شبكة الأقسام */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{display:flex;flex-direction:column;justify-content:space-between;gap:16px;min-height:112px;padding:14px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);text-align:right}
+.tile:hover{border-color:var(--primary)}
+.tile .i{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:var(--primary-soft);color:var(--primary)}
+.tile .n{font-size:15px;font-weight:700;line-height:1.3;overflow:hidden;text-overflow:ellipsis}
+.tile .c{font-size:12px;color:var(--fg-2)}
+
+/* شاشة المنتج */
+.pimg{position:relative;aspect-ratio:4/3;max-width:100%;border-radius:var(--r);border:1.5px solid var(--line);overflow:hidden;background:var(--primary-soft);display:grid;place-items:center;color:var(--primary)}
+.pimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pimg .ic{position:relative;width:48px;height:48px}
+.ptitle{margin:16px 0 0;font-size:22px;font-weight:800;line-height:1.4}
+.flbl{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--fg-2)}
+.feat{margin:0;font-size:15px;line-height:1.9}
+.strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+.info{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 6px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);text-align:center;min-width:0}
+.info .ic{width:22px;height:22px;color:var(--primary)}
+.info .l{font-size:11px;color:var(--fg-2)}
+.info .v{font-size:13px;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+.info .v.ltr{direction:ltr;unicode-bidi:isolate}
+.react{margin-top:24px;padding:18px 16px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);text-align:center}
+.react h3{margin:0 0 14px;font-size:16px;font-weight:700}
+.react .row{display:flex;justify-content:space-evenly;gap:8px}
+.face{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px;border-radius:var(--r);font-size:12px;font-weight:600}
+.face .b{display:grid;place-items:center;width:64px;height:64px;border-radius:var(--r);background:var(--surface-2);border:1.5px solid var(--line);color:var(--fg-2)}
+.face .b .ic{width:34px;height:34px}
+.face.yes .b{background:var(--primary-soft);border-color:var(--primary);color:var(--primary)}
+
+/* السلة */
+.basket{flex-direction:column;gap:0;padding:6px 14px}
+.ci{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.ci:last-of-type{border-bottom:0}
+.ci .cn{min-width:0}.ci .cn b{display:block;font-size:15px;line-height:1.4}.ci .cn span{font-size:12px;color:var(--fg-2)}
+.qty{display:flex;align-items:center;gap:6px;flex:none}
+.qty button{display:grid;place-items:center;width:40px;height:40px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface-2);color:var(--primary)}
+.qty button .ic{width:18px;height:18px}
+.qty output{min-width:28px;text-align:center;font-weight:800}
+.sum{display:flex;justify-content:space-between;gap:12px;padding:12px 0;font-weight:800;border-top:1.5px solid var(--line)}
+.sum.sm{font-weight:600;font-size:13px;color:var(--fg-2);border:0;padding:4px 0 10px}
+.bdg{position:absolute;top:-2px;inset-inline-start:calc(50% + 6px);min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--gold);color:var(--gold-ink);font-size:11px;font-style:normal;font-weight:800;line-height:18px;text-align:center}
+.tab .ico{position:relative;display:grid;place-items:center}
+.gold-btn{margin-top:12px}
+/* التبويبات */
+.tabs{position:fixed;bottom:0;left:0;right:0;margin:0 auto;max-width:480px;display:flex;gap:4px;padding:8px max(10px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));background:var(--surface);border-top:1.5px solid var(--line);border-radius:var(--r) var(--r) 0 0;z-index:20}
+.tab{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;padding:6px 2px;border-radius:14px;color:var(--fg-2);font-size:11px;font-weight:600;line-height:1.25;text-align:center}
+.tab .ic{width:24px;height:24px}
+.tab[aria-current="page"]{color:var(--primary);background:var(--primary-soft);font-weight:800}
+
+/* النماذج السفلية */
+.scrim{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+.scrim.mid{align-items:center;padding:20px}
+.sheet{position:relative;width:100%;max-width:480px;max-height:92vh;max-height:92dvh;overflow-y:auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom,0px));background:var(--bg);border:1.5px solid var(--line);border-radius:var(--r) var(--r) 0 0}
+.scrim.mid .sheet{border-radius:var(--r);padding-bottom:20px;max-width:360px;text-align:center}
+.sheet h2{margin:12px 0 4px;font-size:20px;font-weight:800}
+.sheet p{margin:0 0 4px;color:var(--fg-2);line-height:1.7}
+.grab{width:40px;height:4px;border-radius:4px;background:var(--line);margin:0 auto}
+.sheet form{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.field .lbl{font-size:13px;font-weight:700;color:var(--fg-2)}
+.field input,.field select,.field textarea{width:100%;padding:13px 16px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);font-size:15px;text-align:right}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);outline:0}
+.field input.ltr{direction:ltr;text-align:left}
+.field textarea{min-height:96px;resize:vertical;line-height:1.7}
+.field .hint{font-size:12px;color:var(--fg-2)}
+.imgbox{aspect-ratio:4/3;border-radius:var(--r);border:1.5px solid var(--line);background:var(--surface);overflow:hidden;display:grid;place-items:center}
+.imgbox img{width:100%;height:100%;object-fit:cover}
+.imgbox .ph{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--fg-2)}
+.imgbox .ph .ic{width:36px;height:36px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.acc{margin-top:20px;padding:20px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;gap:12px}
+.acc h2{margin:0;font-size:20px}
+.acc p{margin:0;color:var(--fg-2);line-height:1.8}
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:max-content;max-width:min(440px,calc(100% - 32px));padding:10px 18px;background:var(--fg);color:var(--bg);border-radius:var(--r);font-weight:600;font-size:13px;text-align:center;z-index:80}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation-duration:.01ms!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="capPat" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect class="pl" x="10" y="10" width="28" height="28"/>
+      <rect class="pl" x="10" y="10" width="28" height="28" transform="rotate(45 24 24)"/>
+      <circle class="pl" cx="24" cy="24" r="4"/>
+      <circle class="pl" cx="0" cy="0" r="3"/><circle class="pl" cx="48" cy="0" r="3"/>
+      <circle class="pl" cx="0" cy="48" r="3"/><circle class="pl" cx="48" cy="48" r="3"/>
+    </pattern>
+    <symbol id="i-hyper" viewBox="0 0 24 24"><path d="M3 4h2l2.2 11h10.6l2-8H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></symbol>
+    <symbol id="i-rest" viewBox="0 0 24 24"><path d="M6 3v5a2 2 0 0 0 4 0V3M8 10v11M18 21V3c-2.2 1.2-3 4-3 7h3"/></symbol>
+    <symbol id="i-cafe" viewBox="0 0 24 24"><path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/></symbol>
+    <symbol id="i-veg" viewBox="0 0 24 24"><path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14zM5 19l8-8"/></symbol>
+    <symbol id="i-fruit" viewBox="0 0 24 24"><path d="M12 7c-2-2-6-1-6 4 0 4 2.5 9 6 9s6-5 6-9c0-5-4-6-6-4zM12 7c0-2 1-3.5 3-4"/></symbol>
+    <symbol id="i-drink" viewBox="0 0 24 24"><path d="M6 3h12l-1.5 17a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1L6 3zM7 9h10"/></symbol>
+    <symbol id="i-sweet" viewBox="0 0 24 24"><path d="M4 20h16M5 20v-6h14v6M6 14c0-2 2-3 3-3s1.5-1 3-1 2 1 3 1 3 1 3 3M12 4v4"/></symbol>
+    <symbol id="i-cloth" viewBox="0 0 24 24"><path d="M8 4L3 7l2.5 4L8 10v10h8V10l2.5 1L21 7l-5-3c0 1.7-1.8 3-4 3S8 5.7 8 4z"/></symbol>
+    <symbol id="i-pharm" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></symbol>
+    <symbol id="i-bread" viewBox="0 0 24 24"><path d="M5 10c0-3 3-5 7-5s7 2 7 5c0 1-.6 1.6-1.5 1.8V19h-11v-7.2C5.6 11.6 5 11 5 10zM10 10l1 2M14 10l1 2"/></symbol>
+    <symbol id="i-meat" viewBox="0 0 24 24"><circle cx="9" cy="9" r="5"/><path d="M13 13l6 6M17.5 20.5a1.5 1.5 0 1 0 3-3"/></symbol>
+    <symbol id="i-spice" viewBox="0 0 24 24"><path d="M7 4h10v3H7zM6 7h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zM9 12h6"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4zM5 17a3 3 0 0 1 3-3h10"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></symbol>
+    <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6L5 8zM9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4zM10 20v-6h4v6"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></symbol>
+    <symbol id="i-pinoff" viewBox="0 0 24 24"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/><path d="M4 4l16 16"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></symbol>
+    <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14c.9 1.4 2.2 2.2 3.5 2.2s2.6-.8 3.5-2.2M9 9.5v.5M15 9.5v.5"/></symbol>
+    <symbol id="i-frown" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 16.5c.9-1.4 2.2-2.2 3.5-2.2s2.6.8 3.5 2.2M9 9.5v.5M15 9.5v.5"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4 17l5-4 4 3 3-2 4 3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l9 9-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></symbol>
+    <symbol id="i-car" viewBox="0 0 24 24"><path d="M4 16v-4l2-5h12l2 5v4M4 16h16M4 16v2.5M20 16v2.5M6.5 12h11"/><circle cx="8" cy="14.5" r=".6"/><circle cx="16" cy="14.5" r=".6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  </defs>
+</svg>
+
+<div class="app" id="app">
+  <div id="view" aria-live="polite"></div>
+  <nav class="tabs" id="tabs" aria-label="التنقل الرئيسي">
+    <a class="tab" href="#/account" data-tab="account"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg><span>حسابي</span></a>
+    <a class="tab" href="#/orders" data-tab="orders"><span class="ico"><svg class="ic" aria-hidden="true"><use href="#i-bag"/></svg><b class="bdg" id="bdg" hidden></b></span><span>طلباتي</span></a>
+    <a class="tab" href="#/" data-tab="home"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg><span>الرئيسية</span></a>
+    <a class="tab" href="#/community" data-tab="community"><svg class="ic" aria-hidden="true"><use href="#i-heart"/></svg><span>التواصل مع محبين آخرين</span></a>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<noscript>يحتاج القبطان إلى تفعيل جافاسكربت في المتصفح.</noscript>
+
+<script>
+(function(){
+'use strict';
+
+/* ===== الإعدادات ===== */
+var BASE='https://rbukxectfdssjpkaijcl.supabase.co';
+var KEY='sb_publishable_geGMlQRoeu67nBFM2qeNEw_BYB4ViJr'; /* مفتاح عام مصمم للتطبيقات، والحماية الفعلية داخل قاعدة البيانات */
+var BUCKET='product-images';
+var NOT_ALLOWED='عذرا لايمكن الإضافة';
+var SOON='سنجهّز هذه الشاشة معك في الخطوة التالية';
+
+/* ===== أدوات عامة ===== */
+var AR='٠١٢٣٤٥٦٧٨٩';
+function arNum(v){return String(v).replace(/\d/g,function(d){return AR[+d]}).replace(/\./g,'٫');}
+function westernDigits(s){return String(s).replace(/[٠-٩]/g,function(d){return AR.indexOf(d)}).replace(/[۰-۹]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)}).replace(/٫/g,'.').replace(/،/g,',');}
+function num(v){var n=parseFloat(westernDigits(String(v).trim()));return isNaN(n)?null:n;}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
+function nl2br(s){return esc(s).replace(/\n/g,'<br>');}
+function telOf(n){var t=westernDigits(n).replace(/[^0-9+]/g,'');return t;}
+function arKm(km){return arNum(km.toFixed(1))+' كم';}
+function arPrice(p){var n=Number(p);return arNum(n===Math.round(n)?n:n.toFixed(2))+' ج.م';}
+function arCount(n){return n===1?'مكان واحد':n===2?'مكانان':arNum(n)+' أماكن';}
+function arProducts(n){return n===0?'لا منتجات بعد':n===1?'منتج واحد':n===2?'منتجان':n<=10?arNum(n)+' منتجات':arNum(n)+' منتجًا';}
+function icon(n,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" aria-hidden="true"><use href="#i-'+n+'"/></svg>';}
+function patSvg(){return '<svg class="pat" aria-hidden="true"><rect width="100%" height="100%" fill="url(#capPat)"/></svg>';}
+function haversine(a,b,c,d){var R=6371,t=Math.PI/180,dl=(c-a)*t,dn=(d-b)*t;var x=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a*t)*Math.cos(c*t)*Math.sin(dn/2)*Math.sin(dn/2);return 2*R*Math.asin(Math.min(1,Math.sqrt(x)));}
+/* وقت التوصيل: زمن التجهيز + ٣ دقائق لكل كيلومتر، بهامش خمس دقائق */
+function etaText(prep,km){var lo=prep+Math.round(km*3);return 'من '+arNum(lo)+' إلى '+arNum(lo+5)+' دقيقة';}
+function $(id){return document.getElementById(id);}
+function imgUrl(path){return path?BASE+'/storage/v1/object/public/'+BUCKET+'/'+path.split('/').map(encodeURIComponent).join('/'):null;}
+
+var toastT;
+function toast(m){var t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},3000);}
+
+/* ===== الاتصال بقاعدة البيانات (REST مباشر) ===== */
+var SKEY='captain_session';
+var session=null;
+try{var raw=JSON.parse(localStorage.getItem(SKEY)||'null');if(raw&&raw.access_token)session=raw;}catch(e){}
+function sessFrom(j){var now=Math.floor(Date.now()/1000);return{access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at||(now+(j.expires_in||3600)),user:j.user||(session&&session.user)||null};}
+function me(){var u=session&&session.user,m=(u&&u.user_metadata)||{};return{email:(u&&u.email)||'',name:m.name||'',phone:m.phone||''};}
+function saveSession(s){session=s;try{if(s)localStorage.setItem(SKEY,JSON.stringify(s));else localStorage.removeItem(SKEY);}catch(e){}}
+function authHeaders(extra){var h={'apikey':KEY};if(session)h['Authorization']='Bearer '+session.access_token;if(extra)for(var k in extra)h[k]=extra[k];return h;}
+async function refreshIfNeeded(){
+  if(!session)return;
+  var now=Math.floor(Date.now()/1000);
+  if(session.expires_at&&session.expires_at-now>60)return;
+  try{
+    var r=await fetch(BASE+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})});
+    if(!r.ok)throw new Error('refresh');
+    var j=await r.json();
+    saveSession(sessFrom(j));
+  }catch(e){saveSession(null);S.isAdmin=false;}
+}
+async function api(method,path,opts){
+  opts=opts||{};
+  await refreshIfNeeded();
+  var h=authHeaders(opts.headers),body;
+  if(opts.json!==undefined){h['Content-Type']='application/json';body=JSON.stringify(opts.json);}
+  var res=await fetch(BASE+path,{method:method,headers:h,body:body});
+  var text=await res.text(),data=null;
+  try{data=text?JSON.parse(text):null;}catch(e){data=text;}
+  if(!res.ok){var er=new Error((data&&(data.message||data.error_description||data.error))||('HTTP '+res.status));er.status=res.status;er.code=data&&data.code;throw er;}
+  return data;
+}
+function qs(q){return Object.keys(q).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(q[k])}).join('&');}
+function sel(table,q,single){return api('GET','/rest/v1/'+table+'?'+qs(q),{headers:single?{'Accept':'application/vnd.pgrst.object+json'}:null});}
+function ins(table,row){return api('POST','/rest/v1/'+table,{json:row,headers:{'Prefer':'return=minimal'}});}
+function insRet(table,row){return api('POST','/rest/v1/'+table,{json:row,headers:{'Prefer':'return=representation','Accept':'application/vnd.pgrst.object+json'}});}
+function upd(table,id,row){return api('PATCH','/rest/v1/'+table+'?id=eq.'+encodeURIComponent(id),{json:row,headers:{'Prefer':'return=minimal'}});}
+function del(table,id){return api('DELETE','/rest/v1/'+table+'?id=eq.'+encodeURIComponent(id),{headers:{'Prefer':'return=minimal'}});}
+function rpc(fn,args){return api('POST','/rest/v1/rpc/'+fn,{json:args||{}});}
+async function uploadImage(blob){
+  await refreshIfNeeded();
+  var path=Date.now()+'-'+Math.random().toString(36).slice(2,8)+'.jpg';
+  var res=await fetch(BASE+'/storage/v1/object/'+BUCKET+'/'+path,{method:'POST',headers:authHeaders({'Content-Type':'image/jpeg','x-upsert':'false','cache-control':'max-age=3600'}),body:blob});
+  if(!res.ok){var t=await res.text();var er=new Error(t||('HTTP '+res.status));er.status=res.status;throw er;}
+  return path;
+}
+function removeImage(path){if(!path)return;api('DELETE','/storage/v1/object/'+BUCKET,{json:{prefixes:[path]}}).catch(function(){});}
+function isDenied(e){return !!e&&(e.status===401||e.status===403||e.code==='42501'||/row-level security|not authorized|unauthorized|permission denied/i.test(e.message||''));}
+
+/* ===== السلة وسجل الطلبات (محفوظة على هذا الجهاز) ===== */
+var CKEY='captain_cart',OKEY='captain_orders';
+function lsGet(k,d){try{var v=JSON.parse(localStorage.getItem(k)||'null');return v==null?d:v;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+var cart=lsGet(CKEY,null);if(cart&&!Array.isArray(cart.items))cart=null;
+var orders=lsGet(OKEY,[]);if(!Array.isArray(orders))orders=[];
+function saveCart(){lsSet(CKEY,cart);updateBadge();}
+function cartCount(){return cart?cart.items.reduce(function(a,i){return a+i.qty},0):0;}
+function cartTotal(items){return items.reduce(function(a,i){return a+(i.price==null?0:i.price*i.qty)},0);}
+function updateBadge(){var b=$('bdg');if(!b)return;var n=cartCount();b.hidden=!n;b.textContent=arNum(n);}
+function orderMessage(){
+  var L=['السلام عليكم، أود طلب ما يلي من القبطان:',''];
+  cart.items.forEach(function(i){L.push('- '+i.name+' × '+arNum(i.qty)+(i.price==null?'':' = '+arPrice(i.price*i.qty)));});
+  L.push('','الإجمالي: '+arPrice(cartTotal(cart.items)));
+  var m=me();if(m.name)L.push('الاسم: '+m.name);if(m.phone)L.push('رقم الموبايل: '+arNum(m.phone));
+  if(S.loc)L.push('موقعي: https://maps.google.com/?q='+S.loc.lat.toFixed(5)+','+S.loc.lng.toFixed(5));
+  L.push('شكرًا لكم.');
+  return L.join('\n');
+}
+async function finalizeOrder(ch){
+  if(!cart||!cart.items.length)return;
+  var c=cart,total=cartTotal(c.items),m=me(),saved=false;
+  var km=(S.loc&&c.lat!=null)?haversine(S.loc.lat,S.loc.lng,c.lat,c.lng):0,eta=(c.prep||0)+Math.round(km*3)+5;
+  if(session){
+    var row={customer_name:m.name||null,customer_phone:m.phone||null,place_id:c.placeId,place_name:c.placeName,place_whatsapp:c.whatsapp||null,items:c.items,total:total,eta_minutes:eta};
+    try{await ins('orders',Object.assign({},row,S.loc?{customer_lat:S.loc.lat,customer_lng:S.loc.lng}:{}));saved=true;}
+    catch(e){try{await ins('orders',row);saved=true;}catch(e2){}}
+  }
+  if(!saved){
+    orders.unshift({id:Date.now(),at:Date.now(),placeId:c.placeId,placeName:c.placeName,whatsapp:c.whatsapp||'',prep:c.prep,lat:c.lat,lng:c.lng,items:c.items,total:total});
+    orders=orders.slice(0,30);lsSet(OKEY,orders);
+  }
+  cart=null;saveCart();
+  var how=ch==='call'?'سجّلنا طلبك، وبعد مكالمتك للمحل يؤكد لك التفاصيل':'جهّزنا رسالة طلبك في واتساب';
+  toast(saved?how+'، وأضفنا الطلب إلى طلباتك الجارية':how+'، وحفظنا الطلب في سجلك');
+  if(route().name==='orders')render();
+}
+
+/* ===== الحالة ===== */
+var S={rideStaff:false,perm:'asking',permCode:0,permState:'',loc:null,cats:[],places:[],catIdx:0,isAdmin:false,shops:[],flash:null,loaded:false,failed:false};
+var renderTok=0;
+
+async function checkAdmin(){
+  if(!session){S.isAdmin=false;S.shops=[];S.rideStaff=false;return false;}
+  try{S.isAdmin=(await rpc('is_admin'))===true;}catch(e){S.isAdmin=false;}
+  try{var sh=await sel('shop_staff',{select:'place_id,places(name)',user_id:'eq.'+session.user.id});S.shops=(sh||[]).map(function(x){return{id:x.place_id,name:x.places?x.places.name:''};});}catch(e){S.shops=[];}
+  try{var rs=await sel('ride_staff',{select:'user_id',user_id:'eq.'+session.user.id});S.rideStaff=!!(rs&&rs.length);}catch(e){S.rideStaff=false;}
+  return S.isAdmin;
+}
+function placeById(id){for(var i=0;i<S.places.length;i++)if(S.places[i].id===id)return S.places[i];return null;}
+function catById(id){for(var i=0;i<S.cats.length;i++)if(S.cats[i].id===id)return S.cats[i];return null;}
+
+/* ===== الموقع ===== */
+function askLocation(){
+  S.perm='asking';S.loaded=false;
+  if(!navigator.geolocation){S.perm='unsupported';render();return;}
+  render();
+  navigator.geolocation.getCurrentPosition(function(pos){
+    S.loc={lat:pos.coords.latitude,lng:pos.coords.longitude};S.perm='granted';loadHome();
+  },function(err){
+    S.perm='denied';S.permCode=err&&err.code||1;
+    if(navigator.permissions&&navigator.permissions.query){
+      navigator.permissions.query({name:'geolocation'}).then(function(p){S.permState=p.state;render();},function(){render();});
+    }else render();
+  },{enableHighAccuracy:false,timeout:20000,maximumAge:300000});
+}
+async function loadHome(){
+  S.failed=false;S.loaded=false;render();
+  try{
+    var r=await Promise.all([sel('categories',{select:'*',order:'sort_order.asc'}),rpc('places_near',{p_lat:S.loc.lat,p_lng:S.loc.lng})]);
+    S.cats=r[0]||[];S.places=r[1]||[];S.loaded=true;
+  }catch(e){S.failed=true;}
+  render();
+}
+
+/* ===== البحث العربي ===== */
+function norm(s){return String(s).toLowerCase().replace(/[ً-ٰٟـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/ؤ/g,'و').replace(/ئ/g,'ي').replace(/\s+/g,' ').trim();}
+function words(s){return norm(s).split(/[\s،,]+/).filter(Boolean).map(function(w){return(w.indexOf('ال')===0&&w.length>2)?w.slice(2):w});}
+function lev(a,b){var m=a.length,n=b.length,d=[],i,j;for(i=0;i<=m;i++)d[i]=[i];for(j=1;j<=n;j++)d[0][j]=j;for(i=1;i<=m;i++)for(j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+function searchPlaces(q){
+  var qt=words(q);if(!qt.length)return{exact:[],near:[]};
+  var items=S.places.map(function(p){var c=catById(p.category_id);return{p:p,hay:words(p.name+' '+(c?c.label:'')+' '+(p.section_names||[]).join(' '))};});
+  var exact=[],near=[];
+  items.forEach(function(x){
+    if(qt.every(function(t){return x.hay.some(function(w){return w.indexOf(t)!==-1})})){exact.push(x);return;}
+    if(qt.every(function(t){var al=t.length>=6?2:t.length>=4?1:0;return x.hay.some(function(w){return w.indexOf(t)!==-1||lev(w,t)<=al})}))near.push(x);
+  });
+  function byDist(a,b){return a.p.distance_km-b.p.distance_km}
+  exact.sort(byDist);exact=exact.slice(0,6);
+  if(exact.length){var top=exact[0].p.category_id;items.forEach(function(x){if(x.p.category_id===top&&exact.indexOf(x)===-1&&near.indexOf(x)===-1)near.push(x);});}
+  near=near.filter(function(x){return exact.indexOf(x)===-1}).sort(byDist).slice(0,4);
+  return{exact:exact.map(function(x){return x.p}),near:near.map(function(x){return x.p})};
+}
+
+/* ===== التوجيه ===== */
+function route(){var h=location.hash.replace(/^#\/?/,'');var p=h.split('/');return{name:p[0]||'home',id:p[1]?decodeURIComponent(p[1]):null};}
+function setView(html,tabs){$('view').innerHTML=html;$('app').classList.toggle('notabs',!tabs);$('tabs').hidden=!tabs;}
+function setActiveTab(name){var ts=document.querySelectorAll('.tab');for(var i=0;i<ts.length;i++){if(ts[i].getAttribute('data-tab')===name)ts[i].setAttribute('aria-current','page');else ts[i].removeAttribute('aria-current');}}
+function loading(){return '<div class="spin" role="status" aria-label="جاري التحميل"></div>';}
+function failedHtml(msg){return '<div class="empty">'+esc(msg||'تعذّر التحميل الآن، جرّب مرة أخرى بعد قليل.')+'<br><br><button class="btn s" data-act="reload">إعادة المحاولة</button></div>';}
+function header(title,sub,backHref,chips){
+  return '<header class="hdr">'+patSvg()+'<div class="hdr-top"><a class="back" href="'+esc(backHref)+'" aria-label="رجوع">'+icon('back')+'</a><h1>'+esc(title)+'</h1></div>'+
+    (sub?'<div class="sub">'+esc(sub)+'</div>':'')+(chips?'<div class="chips">'+chips+'</div>':'')+'</header>';
+}
+function chip(ic,text,gold){return '<span class="chip'+(gold?' t':'')+'">'+icon(ic)+esc(text)+'</span>';}
+
+async function render(){
+  var r=route(),tok=++renderTok;
+  var tabName=({home:'home',account:'account',taxonomy:'account',complaints:'account',ride:'home',rides:'account',ridestaff:'account',shoporders:'account',staff:'account',orders:'orders',community:'community'})[r.name];
+  setActiveTab(tabName||'');
+  if(r.name==='orders'){viewOrders();return;}
+  if(r.name==='community'){viewCommunity();return;}
+  if(r.name==='account'){viewAccount();return;}
+  if(S.perm!=='granted'){viewPerm();return;}
+  if(r.name==='home'){if(!S.loaded&&!S.failed){setView(homeShell(),true);bindHome();$('list').innerHTML=loading();return;}viewHome();return;}
+  var h;
+  setView(loading(),false);
+  try{
+    if(r.name==='place')h=await viewPlace(r.id);
+    else if(r.name==='section')h=await viewSection(r.id);
+    else if(r.name==='product')h=await viewProduct(r.id);
+    else if(r.name==='similar')h=await viewSimilar(r.id);
+    else if(r.name==='alternatives')h=await viewSimilar(r.id,true);
+    else if(r.name==='taxonomy')h=await viewTaxonomy();
+    else if(r.name==='complaints')h=await viewComplaints();
+    else if(r.name==='shoporders')h=await viewShopOrders();
+    else if(r.name==='staff')h=await viewStaff();
+    else if(r.name==='ride')h=await viewRide();
+    else if(r.name==='rides')h=await viewRides();
+    else if(r.name==='ridestaff')h=await viewRideStaff();
+    else{location.hash='#/';return;}
+  }catch(e){h={html:header('تعذّر التحميل','','#/')+'<div class="g">'+failedHtml()+'</div>'};}
+  if(tok!==renderTok)return;
+  setView(h.html,false);
+  if(h.after)h.after();
+}
+window.addEventListener('hashchange',function(){window.scrollTo(0,0);render();});
+
+/* ===== الإذن ===== */
+function viewPerm(){
+  if(S.perm==='asking'){setView('<div class="g"><div class="deny">'+patSvg()+'<div class="big">'+icon('pin')+'</div><h2>نحتاج إلى موقعك</h2><p>نستخدم موقعك لنعرض لك الأماكن الأقرب إليك ونقدّر وقت وصول طلبك. اختر السماح في نافذة المتصفح.</p>'+loading()+'</div></div>',false);return;}
+  var browserBlocked=S.permState==='denied';
+  var title=S.perm==='unsupported'?'متصفحك لا يدعم تحديد الموقع':(S.permCode===1?'يجب منح إذن الموقع':'تعذّر تحديد موقعك الآن');
+  var body=S.perm==='unsupported'?'جرّب فتح القبطان من متصفح آخر.':
+    S.permCode===1?(browserBlocked?'الإذن مغلق من إعدادات المتصفح. اضغط على أيقونة القفل بجوار عنوان الموقع، واختر السماح للموقع، ثم حدّث الصفحة.':'نحتاج موقعك لنعرض لك الأماكن الأقرب إليك ونقدّر وقت وصول طلبك.'):
+    'تأكد من تشغيل خدمة الموقع في جهازك، ثم حاول مرة أخرى.';
+  var btn=S.perm==='unsupported'?'':'<button class="btn p" data-act="askloc">'+(browserBlocked?'تحديث الصفحة':(S.permCode===1?'منح الإذن':'إعادة المحاولة'))+'</button>';
+  setView('<header class="band g locked">'+patSvg()+'<div class="search">'+icon('search')+'<input type="search" disabled placeholder="ابحث عن مطعم أو هايبر أو مقهى" aria-label="ابحث"></div><div class="meta-row"><div class="loc">'+icon('pinoff')+'<span>الموقع غير مفعّل</span></div><div class="brand">'+icon('compass')+'القبطان</div></div></header>'+
+    '<div class="g"><div class="deny">'+patSvg()+'<div class="big">'+icon('pinoff')+'</div><h2>'+title+'</h2><p>'+body+'</p>'+btn+'</div></div>',true);
+}
+
+/* ===== الرئيسية ===== */
+var MSG=['ادخل على القبطان الآن، ستجد ما يسرّك','نوصّل إليك ما تحتاجه بهدوء وأمان','اختر ما يناسبك، ونحن نتكفّل بالباقي','يسعدنا أن نخدمك اليوم'],mi=0;
+setInterval(function(){var n=$('note');if(n){mi=(mi+1)%MSG.length;n.textContent=MSG[mi];}},9000);
+
+function homeShell(){
+  return '<header class="band g">'+patSvg()+
+    '<div class="search" id="searchBox" role="search">'+icon('search')+'<input id="q" type="search" autocomplete="off" enterkeyhint="search" placeholder="ابحث عن مطعم أو هايبر أو مقهى" aria-label="ابحث عن مكان"><button class="clr" id="clr" type="button" aria-label="مسح البحث" hidden>'+icon('x')+'</button></div>'+
+    '<div class="meta-row"><div class="loc">'+icon('pin')+'<span>التوصيل إلى <b>موقعك الحالي</b></span></div><div class="brand">'+icon('compass')+'القبطان</div></div></header>'+
+    '<div class="sugg" id="sugg" hidden></div>'+
+    '<div class="note g"><p id="note">'+esc(MSG[mi])+'</p></div>'+
+    '<div class="g"><a class="ridecard" href="#/ride">'+icon('car')+'<div><b>هَل تحتاج أنْ تصلَ لمَكانٍ ؟</b><span>اٌطلُبْ قُبطانك الآن واٌطمئنِ فلن نختلف أبدًا</span></div></a></div>'+
+    '<nav class="cats g" id="cats" aria-label="أنواع المحلات"></nav>'+
+    '<main class="g" id="list"></main>'+
+    '<div class="g" id="addPlace" style="padding-top:4px" hidden><button class="btn s block" data-act="addplace">'+icon('plus')+'إضافة محل</button></div>'+
+    '<section class="cheer g"><div class="in">'+patSvg()+'<h3>قُبْطَانُكَ دَلِيلُكَ لِبَرِّ الأَمَانِ</h3><p>اطلب ما يسرّك الآن، ونوصّله إليك بهدوء وأمان.</p></div></section>';
+}
+function viewHome(){
+  setView(homeShell(),true);bindHome();
+  if(S.failed){$('list').innerHTML=failedHtml('تعذّر تحميل الأماكن الآن، جرّب مرة أخرى بعد قليل.');$('cats').hidden=true;return;}
+  if(!S.cats.length){$('cats').hidden=true;$('list').innerHTML='<div class="empty">نجهّز لك الأماكن القريبة، وستجد ما يسرّك هنا قريبًا.</div>';return;}
+  renderCats();renderList();
+}
+function bindHome(){
+  if($('addPlace'))$('addPlace').hidden=!S.isAdmin;
+  var q=$('q');if(!q)return;
+  q.addEventListener('input',renderSugg);q.addEventListener('focus',renderSugg);
+}
+function renderCats(){
+  $('cats').innerHTML=S.cats.map(function(c,i){return '<button class="cat" type="button" data-act="cat" data-i="'+i+'" aria-pressed="'+(i===S.catIdx)+'"><span class="box">'+icon(c.icon_key)+'</span><span class="lbl">'+esc(c.label)+'</span></button>';}).join('');
+}
+function renderList(){
+  var c=S.cats[S.catIdx];if(!c)return;
+  var list=S.places.filter(function(p){return p.category_id===c.id}).sort(function(a,b){return a.distance_km-b.distance_km});
+  var h='<div class="sec-head"><h2>'+esc(c.label)+'</h2><span>'+arCount(list.length)+' مرتبة من الأقرب</span></div>';
+  if(!list.length)h+='<div class="empty" style="padding-top:0">لا توجد أماكن في هذا القسم الآن، وسنضيف المزيد قريبًا.</div>';
+  else{
+    h+='<div class="list">';
+    list.forEach(function(p){
+      h+='<a class="card'+(p.id===S.flash?' flash':'')+'" id="p-'+esc(p.id)+'" href="#/place/'+encodeURIComponent(p.id)+'"><span class="thumb">'+patSvg()+icon(c.icon_key)+'</span><span class="body"><span class="nm">'+esc(p.name)+'</span>'+
+        ((p.section_names&&p.section_names.length)?'<span class="sc">الأقسام: '+esc(p.section_names.join('، '))+'</span>':'')+
+        '<span class="chips">'+chip('pin',arKm(p.distance_km))+chip('clock',etaText(p.prep_minutes,p.distance_km),true)+'</span></span></a>';
+    });
+    h+='</div>';
+  }
+  $('list').innerHTML=h;
+  if(S.flash){var n=$('p-'+S.flash);if(n)n.scrollIntoView({block:'center',behavior:'smooth'});var id=S.flash;setTimeout(function(){var m=$('p-'+id);if(m)m.classList.remove('flash');},2200);S.flash=null;}
+}
+function sgItem(p){var c=catById(p.category_id);return '<button class="sg" type="button" data-act="pick" data-id="'+esc(p.id)+'"><span class="t">'+icon(c?c.icon_key:'pin')+'</span><span><span class="n">'+esc(p.name)+'</span><span class="s">'+esc(c?c.label:'')+' - '+arKm(p.distance_km)+'</span></span></button>';}
+function renderSugg(){
+  var q=$('q'),box=$('sugg');if(!q)return;
+  var v=q.value;$('clr').hidden=!v;
+  if(!norm(v)){box.hidden=true;return;}
+  var r=searchPlaces(v),h='';
+  if(r.exact.length)h+='<h4>نتائج مطابقة</h4>'+r.exact.map(sgItem).join('');
+  if(r.near.length)h+='<h4>اقتراحات قريبة</h4>'+r.near.map(sgItem).join('');
+  if(!h)h='<div class="sg-empty">لم نجد مطابقًا الآن، جرّب كلمة أخرى أو اختر نوع المحل من الشريط.</div>';
+  box.innerHTML=h;box.hidden=false;
+}
+
+/* ===== المحل ===== */
+async function viewPlace(id){
+  var r=await Promise.all([
+    sel('places',{select:'id,name,category_id,whatsapp,prep_minutes,lat,lng,categories(label,icon_key)',id:'eq.'+id},true),
+    sel('sections',{select:'id,name,sort_order,products(count)',place_id:'eq.'+id,order:'sort_order.asc,name.asc'})
+  ]);
+  var pl=r[0],secs=r[1]||[];
+  var km=S.loc?haversine(S.loc.lat,S.loc.lng,pl.lat,pl.lng):null;
+  var chips=(km!==null?chip('pin',arKm(km))+chip('clock',etaText(pl.prep_minutes,km),true):'');
+  var ic=(pl.categories&&pl.categories.icon_key)||'pin';
+  var h=header(pl.name,pl.categories?pl.categories.label:'','#/',chips)+'<div class="g">';
+  if(S.isAdmin)h+='<div class="adm"><button class="btn s" data-act="editplace" data-id="'+esc(pl.id)+'">'+icon('edit')+'تعديل المحل</button><button class="btn d" data-act="delplace" data-id="'+esc(pl.id)+'">'+icon('trash')+'حذف المحل</button></div>';
+  h+='<div class="sec-head"><h2>الأقسام</h2></div>';
+  if(!secs.length)h+='<div class="empty" style="padding-top:0">نجهّز أقسام هذا المحل، وستجد ما يسرّك هنا قريبًا.</div>';
+  else{
+    h+='<div class="grid2">';
+    secs.forEach(function(s){var n=(s.products&&s.products[0]&&s.products[0].count)||0;h+='<a class="tile" href="#/section/'+encodeURIComponent(s.id)+'"><span class="i">'+icon('tag')+'</span><span><span class="n" style="display:block">'+esc(s.name)+'</span><span class="c">'+arProducts(n)+'</span></span></a>';});
+    h+='</div>';
+  }
+  h+='<div style="padding-top:16px"><button class="btn s block" data-act="addsection" data-id="'+esc(pl.id)+'" data-n="'+secs.length+'">'+icon('plus')+'إضافة قسم</button></div></div>';
+  window.__place=pl;window.__ic=ic;
+  return{html:h};
+}
+
+/* ===== القسم ===== */
+async function viewSection(id){
+  var r=await Promise.all([
+    sel('sections',{select:'id,name,place_id,places(id,name)',id:'eq.'+id},true),
+    sel('products',{select:'id,name,price,image_path,is_active',section_id:'eq.'+id,order:'created_at.asc'})
+  ]);
+  var sc=r[0],prods=r[1]||[];
+  var pname=sc.places?sc.places.name:'';
+  var h=header(sc.name,pname,'#/place/'+encodeURIComponent(sc.place_id),chip('tag',arProducts(prods.length)))+'<div class="g">';
+  if(S.isAdmin)h+='<div class="adm"><button class="btn d" data-act="delsection" data-id="'+esc(sc.id)+'" data-place="'+esc(sc.place_id)+'">'+icon('trash')+'حذف القسم</button></div>';
+  h+='<div style="padding-top:16px"></div>';
+  if(!prods.length)h+='<div class="empty" style="padding-top:0">نجهّز منتجات هذا القسم، وستجد ما يسرّك هنا قريبًا.</div>';
+  else{
+    h+='<div class="list">';
+    prods.forEach(function(p){h+=productCard(p,null);});
+    h+='</div>';
+  }
+  h+='<div style="padding-top:16px"><button class="btn s block" data-act="addproduct" data-id="'+esc(sc.id)+'">'+icon('plus')+'إضافة منتج</button></div></div>';
+  return{html:h};
+}
+function productCard(p,placeName){
+  var u=imgUrl(p.image_path);
+  return '<a class="card" href="#/product/'+encodeURIComponent(p.id)+'"><span class="thumb sq">'+patSvg()+icon('bag')+(u?'<img alt="" loading="lazy" src="'+esc(u)+'" onerror="this.remove()">':'')+'</span><span class="body"><span class="nm">'+esc(p.name)+'</span>'+(placeName?'<span class="sc">'+esc(placeName)+'</span>':'')+'<span class="chips">'+chip('tag',p.price==null?'السعر عبر واتساب أو اتصال':arPrice(p.price),true)+'</span></span></a>';
+}
+
+/* ===== المنتج ===== */
+var cur={};
+async function viewProduct(id){
+  var SEC='sections(id,name,place_id,places(id,name,whatsapp,prep_minutes,lat,lng))',p;
+  try{p=await sel('products',{select:'*,items(name,families(name)),'+SEC,id:'eq.'+id},true);}
+  catch(e){p=await sel('products',{select:'*,'+SEC,id:'eq.'+id},true);}
+  var sc=p.sections||{},pl=sc.places||null;
+  cur={product:p,section:sc,place:pl};
+  var u=imgUrl(p.image_path);
+  var eta='عند الطلب';
+  if(pl&&S.loc&&pl.lat!=null)eta=etaText(pl.prep_minutes,haversine(S.loc.lat,S.loc.lng,pl.lat,pl.lng));
+  var wa=pl&&pl.whatsapp?pl.whatsapp:'';
+  var waDigits=westernDigits(wa).replace(/[^0-9]/g,'');
+  var back=sc.id?'#/section/'+encodeURIComponent(sc.id):'#/';
+  var h='<header class="hdr" style="padding-bottom:12px">'+patSvg()+'<div class="hdr-top"><a class="back" href="'+back+'" aria-label="رجوع">'+icon('back')+'</a><div class="sub" style="padding:0">'+esc(pl?pl.name:'')+(sc.name?' - '+esc(sc.name):'')+'</div></div></header>';
+  h+='<div class="g" style="padding-top:16px;padding-bottom:32px">';
+  h+='<div class="pimg">'+icon('bag')+(u?'<img alt="'+esc(p.name)+'" src="'+esc(u)+'" onerror="this.remove()">':'')+'</div>';
+  h+='<h1 class="ptitle">'+esc(p.name)+'</h1>';
+  h+='<div class="flbl">مميزات المنتج</div><p class="feat">'+(p.features&&p.features.trim()?nl2br(p.features):'ستجد هنا مميزات المنتج قريبًا.')+'</p>';
+  /* الترتيب من اليمين إلى اليسار: سعر المنتج، وقت التوصيل، رقم الواتس */
+  h+='<div class="strip">'+
+    '<div class="info">'+icon('tag')+'<span class="l">سعر المنتج</span><span class="v">'+(p.price==null?'واتساب أو اتصال':arPrice(p.price))+'</span></div>'+
+    '<div class="info">'+icon('clock')+'<span class="l">وقت التوصيل</span><span class="v">'+esc(eta)+'</span></div>'+
+    '<div class="info">'+icon('chat')+'<span class="l">رقم الواتس</span><span class="v'+(wa?' ltr':'')+'">'+(wa?esc(arNum(wa)):'لم يُضف بعد')+'</span></div></div>';
+  if(waDigits)h+='<div class="row2" style="margin-top:12px"><a class="btn p" href="https://wa.me/'+waDigits+'" target="_blank" rel="noopener">'+icon('chat')+'واتساب</a><a class="btn s" href="tel:'+esc(telOf(wa))+'">'+icon('phone')+'اتصال</a></div>';
+  h+='<button class="btn s block" style="margin-top:12px" data-act="addcart">'+icon('bag')+'أضف إلى طلبي</button>';
+  if(S.isAdmin)h+='<div class="chips" style="padding-top:12px">'+(p.items?chip('tag','الصنف: '+p.items.name)+(p.items.families?chip('tag','الفئة: '+p.items.families.name,true):''):chip('tag','غير مرتبط بصنف بعد',true))+'<a class="chip" href="#/taxonomy">'+icon('edit')+'إدارة الأصناف والفئات</a></div>';
+  if(S.isAdmin)h+='<div class="adm"><button class="btn s" data-act="editproduct">'+icon('edit')+'تعديل المنتج</button><button class="btn d" data-act="delproduct">'+icon('trash')+'حذف المنتج</button></div>';
+  /* تقييم بوجهين خطيين (وليس إيموجي) */
+  h+='<div class="react"><h3>ما رأيك في هذا المنتج؟</h3><div class="row">'+
+    '<button class="face yes" data-act="like" data-id="'+esc(p.id)+'"><span class="b">'+icon('smile')+'</span>أعجبني</button>'+
+    '<button class="face" data-act="dislike" data-id="'+esc(p.id)+'"><span class="b">'+icon('frown')+'</span>ليس مناسبًا لي</button></div></div>';
+  h+='</div>';
+  return{html:h};
+}
+/* التشابه يحدده المالك: كل منتج يُربط بـ"صنف" (مثل جبنة رومي)، وكل صنف يتبع "فئة" (مثل الجبن).
+   الإعجاب: نفس الصنف في محلات أخرى. عدم الإعجاب: أصناف أخرى من نفس الفئة. */
+async function viewSimilar(id,alt){
+  var p=await sel('products',{select:'id,name',id:'eq.'+id},true),rows=[],linked=false;
+  try{
+    var q=await sel('products',{select:'id,item_id,items(family_id)',id:'eq.'+id},true);
+    var cols='id,name,price,image_path,section_id,sections(name,place_id,places(id,name))';
+    if(q.item_id){
+      linked=true;
+      if(!alt)rows=await sel('products',{select:cols,item_id:'eq.'+q.item_id,id:'neq.'+id,limit:'40'})||[];
+      else if(q.items&&q.items.family_id)rows=await sel('products',{select:cols+',items!inner(family_id)','items.family_id':'eq.'+q.items.family_id,item_id:'neq.'+q.item_id,id:'neq.'+id,limit:'40'})||[];
+    }
+  }catch(e){linked=false;rows=[];}
+  rows.sort(function(a,b){return alt?String(a.name).localeCompare(String(b.name),'ar'):((a.price==null?1e12:a.price)-(b.price==null?1e12:b.price));});
+  var h=header(alt?'بدائل أخرى لك':'نفس المنتج في محلات أخرى',p.name,'#/product/'+encodeURIComponent(id))+'<div class="g" style="padding-top:16px;padding-bottom:32px">';
+  if(alt)h+='<div class="note" style="padding:0 0 14px"><p>انظر إلى منتج آخر كل الأفضل هنا</p></div>';
+  if(!rows.length)h+='<div class="empty">'+(!linked?'نجهّز لك هنا منتجات مشابهة، وستجد ما يسرّك قريبًا.':(alt?'لا توجد أصناف أخرى من هذه الفئة الآن، وسنضيف المزيد قريبًا.':'لا يوجد هذا المنتج في محلات أخرى الآن، وسنضيف المزيد قريبًا.'))+'</div>';
+  else{h+='<div class="list">';rows.forEach(function(x){h+=productCard(x,x.sections&&x.sections.places?x.sections.places.name:'');});h+='</div>';}
+  return{html:h+'</div>'};
+}
+
+/* ===== طلباتي ===== */
+function dateAr(ms){try{return new Date(ms).toLocaleDateString('ar-EG',{day:'numeric',month:'long',year:'numeric'});}catch(e){return '';}}
+var DAY=86400000,ordIdx={};
+function isCurrent(o){var age=Date.now()-new Date(o.created_at).getTime();return !o.local&&(((o.status==='sent'||o.status==='received')&&age<DAY)||(o.status==='not_arrived'&&age<3*DAY));}
+function localAsOrder(o){return{id:'L'+o.id,local:true,created_at:new Date(o.at).toISOString(),place_id:o.placeId||null,place_name:o.placeName,items:o.items,total:o.total,status:'local'};}
+function ordStatusChip(o){
+  if(o.local)return chip('chat','أُرسل عبر واتساب');
+  if(o.status==='arrived')return chip('smile','وصل الطلب');
+  if(isCurrent(o))return o.status==='not_arrived'?chip('clock','أبلغتنا أنه لم يصل، ونتابع مع المحل',true):o.status==='received'?chip('bag','المحل استلم طلبك',true):chip('chat','أُرسل الطلب');
+  return chip('clock','لم يُؤكَّد');
+}
+function orderCard(o){
+  ordIdx[o.id]=o;
+  var cur=isCurrent(o),b='';
+  if(cur)b='<div class="adm" style="padding-top:4px"><button class="btn p" data-act="ans" data-id="'+esc(o.id)+'" data-v="1">وصل الطلب، شكرًا</button>'+(o.status==='not_arrived'?'':'<button class="btn s" data-act="ans" data-id="'+esc(o.id)+'" data-v="0">لم يصل بعد، شكرًا</button>')+'</div>';
+  else b='<div class="adm" style="padding-top:4px"><button class="btn s" data-act="reorder" data-id="'+esc(o.id)+'">'+icon('bag')+'أعد هذا الطلب</button></div>';
+  return '<div class="card" style="flex-direction:column;gap:6px"><span class="nm" style="font-weight:700">'+esc(o.place_name)+'</span><span class="sc" style="font-size:12px;color:var(--fg-2)">'+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'</span><span class="chips">'+chip('clock',dateAr(o.created_at))+chip('tag',arPrice(o.total),true)+ordStatusChip(o)+'</span>'+b+'</div>';
+}
+async function viewOrders(){
+  var tok=++renderTok;
+  setView(loading(),true);setActiveTab('orders');
+  var dbo=[],dbFail=false;
+  if(session&&session.user){try{dbo=await sel('orders',{select:'*',user_id:'eq.'+session.user.id,order:'created_at.desc',limit:'50'})||[];}catch(e){dbFail=true;}}
+  if(tok!==renderTok)return;
+  ordIdx={};
+  var h='<header class="hdr">'+patSvg()+'<div class="hdr-top"><h1 style="padding:8px 12px">طلباتي</h1></div></header><div class="g">';
+  if(cart&&cart.items.length){
+    var total=cartTotal(cart.items),unp=cart.items.some(function(i){return i.price==null});
+    var digits=westernDigits(cart.whatsapp||'').replace(/[^0-9]/g,'');
+    h+='<div class="sec-head"><h2>طلبك الحالي</h2><span>'+esc(cart.placeName)+'</span></div><div class="card basket">';
+    cart.items.forEach(function(i){
+      h+='<div class="ci"><div class="cn"><b>'+esc(i.name)+'</b><span>'+(i.price==null?'السعر عبر واتساب أو اتصال':arPrice(i.price))+'</span></div>'+
+        '<div class="qty"><button type="button" data-act="qty" data-id="'+esc(i.id)+'" data-d="1" aria-label="زيادة الكمية">'+icon('plus')+'</button><output aria-label="الكمية">'+arNum(i.qty)+'</output><button type="button" data-act="qty" data-id="'+esc(i.id)+'" data-d="-1" aria-label="إنقاص الكمية">'+icon(i.qty===1?'trash':'minus')+'</button></div></div>';
+    });
+    h+='<div class="sum"><span>الإجمالي'+(unp?' (دون المنتجات بلا سعر)':'')+'</span><span>'+arPrice(total)+'</span></div>';
+    if(S.loc&&cart.lat!=null)h+='<div class="sum sm"><span>وقت التوصيل المتوقع</span><span>'+etaText(cart.prep,haversine(S.loc.lat,S.loc.lng,cart.lat,cart.lng))+'</span></div>';
+    h+='</div>';
+    if(digits)h+='<a class="btn p block gold-btn" data-act="sendorder" target="_blank" rel="noopener" href="https://wa.me/'+digits+'?text='+encodeURIComponent(orderMessage())+'">'+icon('chat')+'أرسل الطلب عبر واتساب</a><a class="btn s block gold-btn" data-act="sendorder" data-ch="call" href="tel:'+esc(telOf(cart.whatsapp))+'">'+icon('phone')+'أو اتصل بالمحل</a>';
+    else h+='<div class="empty">لم يُضف المحل رقم واتساب بعد، فلا نستطيع تجهيز الرسالة الآن.</div>';
+    h+='<button class="btn s block gold-btn" data-act="clearcart">تفريغ السلة</button>'+
+       '<p class="foot" style="padding-top:10px;font-size:13px;color:var(--fg-2)">يؤكد لك المحل السعر النهائي ووقت الوصول عبر واتساب.</p>';
+  }else{
+    h+='<div class="deny">'+patSvg()+'<div class="big">'+icon('bag')+'</div><h2>سلتك فارغة</h2><p>اختر ما يسرّك من المحلات، وأضفه إلى طلبك من شاشة المنتج.</p><a class="btn p" href="#/">تصفّح المحلات</a></div>';
+  }
+  var loc=orders.map(localAsOrder);
+  var curr=dbo.filter(isCurrent),past=dbo.filter(function(o){return !isCurrent(o)}).concat(loc).sort(function(a,b){return a.created_at<b.created_at?1:-1});
+  if(session){
+    h+='<div class="sec-head"><h2>طلباتي الجارية</h2></div>';
+    if(dbFail)h+='<div class="empty" style="padding-top:0">تعذّر تحميل طلباتك المحفوظة الآن، جرّب مرة أخرى بعد قليل.</div>';
+    else if(!curr.length)h+='<div class="empty" style="padding-top:0">لا توجد طلبات جارية الآن.</div>';
+    else h+='<div class="list">'+curr.map(orderCard).join('')+'</div>';
+  }
+  h+='<div class="sec-head"><h2>طلباتي السابقة</h2></div>';
+  if(!past.length)h+='<div class="empty" style="padding-top:0">ستجد هنا طلباتك بعد أن ترسل أول طلب.</div>';
+  else h+='<div class="list">'+past.map(orderCard).join('')+'</div>';
+  if(orders.length)h+='<button class="btn s block gold-btn" data-act="clearorders">مسح السجل المحفوظ على هذا الجهاز</button>';
+  h+='<p style="padding:14px 0 0;font-size:12px;color:var(--fg-2)">'+(session?'تُحفظ طلباتك في حسابك لتتابع حالتها من أي جهاز، وتُحفظ سلتك على هذا الجهاز.':'أنشئ حسابًا من تبويب حسابي لتتابع حالة طلباتك. طلباتك الآن محفوظة على هذا الجهاز فقط.')+'</p></div>';
+  setView(h,true);setActiveTab('orders');
+}
+async function actAnswer(id,v){
+  try{await rpc('answer_order',{p_id:id,p_arrived:v});toast(v?'يسعدنا أنه وصلك، شكرًا لك':'نعتذر عن التأخير، وسنتابع مع المحل');}
+  catch(e){toast('تعذّر إرسال إجابتك الآن، جرّب مرة أخرى');}
+  closeSheet();
+  if(route().name==='orders')render();
+}
+async function actReorder(id){
+  var o=ordIdx[id];if(!o)return;
+  var pid=o.place_id;if(!pid){toast('تعذّر العثور على المحل، اختر طلبك من جديد');return;}
+  if(cart&&cart.items.length&&!await confirmSheet('استبدال السلة','سلتك الحالية فيها منتجات. هل نستبدلها بهذا الطلب؟','نعم، استبدلها',true))return;
+  try{
+    var pl=await sel('places',{select:'id,name,whatsapp,prep_minutes,lat,lng',id:'eq.'+pid},true);
+    var pr=await sel('products',{select:'id,name,price',id:'in.('+o.items.map(function(i){return i.id}).join(',')+')'})||[];
+    var by={};pr.forEach(function(x){by[x.id]=x;});
+    var items=[],miss=0;
+    o.items.forEach(function(i){var x=by[i.id];if(x)items.push({id:x.id,name:x.name,price:x.price==null?null:Number(x.price),qty:i.qty});else miss++;});
+    if(!items.length){toast('هذه المنتجات لم تعد متاحة، اختر غيرها من المحل');location.hash='#/place/'+encodeURIComponent(pid);return;}
+    cart={placeId:pl.id,placeName:pl.name,whatsapp:pl.whatsapp||'',prep:pl.prep_minutes,lat:pl.lat,lng:pl.lng,items:items};
+    saveCart();toast(miss?'أعدنا ما توفر من طلبك بأسعاره الحالية، وبعض المنتجات لم تعد متاحة':'أعدنا طلبك بأسعاره الحالية، ويمكنك تعديله قبل الإرسال');
+    render();window.scrollTo(0,0);
+  }catch(e){toast('تعذّر إعادة الطلب الآن، جرّب مرة أخرى');}
+}
+/* سؤال "هل وصلك الطلب؟": يظهر بعد وقت التوصيل المقدّر بربع ساعة، ولا يتكرر قبل نصف ساعة، وتجاهله لا يضر */
+var ASKKEY='captain_asked';
+async function checkFollowUp(){
+  if(!session||!session.user||$('scrim'))return;
+  var rows;
+  try{rows=await sel('orders',{select:'id,place_name,created_at,eta_minutes,status',user_id:'eq.'+session.user.id,status:'in.(sent,received)',order:'created_at.desc',limit:'5'});}catch(e){return;}
+  var asked=lsGet(ASKKEY,{}),now=Date.now();
+  var due=(rows||[]).filter(function(o){var age=now-new Date(o.created_at).getTime();return age>=((o.eta_minutes||45)+15)*60000&&age<DAY&&!(asked[o.id]&&now-asked[o.id]<30*60000);})[0];
+  if(!due||$('scrim'))return;
+  asked[due.id]=now;lsSet(ASKKEY,asked);
+  openSheet('<h2>هل وصلك الطلب؟</h2><p>طلبك من «'+esc(due.place_name)+'». يستحسن الإجابة ليصلك أسرع.</p><div class="acts"><button class="btn p block" id="fuY" style="margin-top:12px">وصل الطلب، شكرًا</button><button class="btn s block" id="fuN">لم يصل بعد، شكرًا</button></div>',true,null);
+  $('fuY').addEventListener('click',function(){actAnswer(due.id,true);});
+  $('fuN').addEventListener('click',function(){actAnswer(due.id,false);});
+}
+
+
+/* ===== حساب المحل: الطلبات الواردة وتأكيد الاستلام ===== */
+function waPhone(n){var d=westernDigits(n||'').replace(/[^0-9]/g,'');if(/^0\d{10}$/.test(d))return '2'+d;return d;}
+var lastPending=null;
+async function shopOrdersHtml(){
+  if(session&&!S.shops.length)await checkAdmin();
+  var hd=header('الطلبات الواردة',S.shops.map(function(x){return x.name}).join('، '),'#/account');
+  if(!S.shops.length)return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لأصحاب المحلات. اطلب من مالك التطبيق ربط حسابك بمحلك.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>',pending:0};
+  var rows=await sel('orders',{select:'*',place_id:'in.('+S.shops.map(function(x){return x.id}).join(',')+')',order:'created_at.desc',limit:'60'})||[];
+  var now=Date.now(),age=function(o){return now-new Date(o.created_at).getTime();};
+  var fresh=rows.filter(function(o){return o.status==='sent'&&age(o)<DAY;});
+  var going=rows.filter(function(o){return o.status==='received'&&age(o)<DAY;});
+  var comp=rows.filter(function(o){return o.status==='not_arrived'&&!o.complaint_handled&&age(o)<3*DAY;});
+  var done=rows.filter(function(o){return fresh.indexOf(o)<0&&going.indexOf(o)<0&&comp.indexOf(o)<0;}).slice(0,15);
+  function contact(o){
+    var wa=waPhone(o.customer_phone),map=(o.customer_lat!=null&&o.customer_lng!=null)?'https://maps.google.com/?q='+o.customer_lat+','+o.customer_lng:'';
+    return (o.customer_phone?'<a class="btn s" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'">'+icon('chat')+'واتساب</a>':'')+(map?'<a class="btn s" target="_blank" rel="noopener" href="'+map+'">'+icon('pin')+'الموقع</a>':'');
+  }
+  function card(o,extra,btn){
+    return '<section class="acc"><h2>'+esc(o.customer_name||'زبون')+'</h2><div class="chips">'+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+chip('clock',dateAr(o.created_at))+chip('tag',arPrice(o.total),true)+(extra||'')+'</div><p>'+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'</p><div class="adm" style="padding-top:0">'+(btn||'')+contact(o)+'</div></section>';
+  }
+  var h=hd+'<div class="g">';
+  h+='<div class="sec-head"><h2>طلبات جديدة تنتظر تأكيدك</h2></div>';
+  if(!fresh.length)h+='<div class="empty" style="padding-top:0">لا توجد طلبات جديدة الآن.</div>';
+  fresh.forEach(function(o){h+=card(o,'','<button class="btn p" data-act="receive" data-id="'+esc(o.id)+'">استلمت الطلب</button>');});
+  if(comp.length){h+='<div class="sec-head"><h2>شكاوى تحتاج اهتمامك</h2></div>';comp.forEach(function(o){h+=card(o,chip('clock','أبلغ أن طلبه لم يصل، حاول ألا تتأخر',true));});}
+  h+='<div class="sec-head"><h2>طلبات جارية</h2></div>';
+  if(!going.length)h+='<div class="empty" style="padding-top:0">لا توجد طلبات جارية.</div>';
+  going.forEach(function(o){h+=card(o,chip('bag','استلمتَ الطلب'));});
+  if(done.length){h+='<div class="sec-head"><h2>آخر الطلبات</h2></div><div class="list">';done.forEach(function(o){h+='<div class="card" style="flex-direction:column;gap:6px"><span class="nm" style="font-weight:700">'+esc(o.customer_name||'زبون')+'</span><span class="sc" style="font-size:12px;color:var(--fg-2)">'+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'</span><span class="chips">'+chip('clock',dateAr(o.created_at))+chip('tag',arPrice(o.total),true)+(o.status==='arrived'?chip('smile','وصل'):'')+'</span></div>';});h+='</div>';}
+  h+='<p style="padding:14px 0 0;font-size:12px;color:var(--fg-2)">تتحدث هذه الشاشة كل نصف دقيقة وهي مفتوحة. ابقها مفتوحة لتصلك الطلبات الجديدة فورًا.</p></div>';
+  return{html:h,pending:fresh.length};
+}
+async function viewShopOrders(){var r=await shopOrdersHtml();lastPending=r.pending;return r;}
+async function refreshShop(){
+  if(route().name!=='shoporders'||$('scrim')||document.hidden)return;
+  try{var r=await shopOrdersHtml();if(route().name!=='shoporders'||$('scrim'))return;
+    if(lastPending!==null&&r.pending>lastPending){toast('وصلك طلب جديد');try{navigator.vibrate&&navigator.vibrate(200);}catch(e){}}
+    lastPending=r.pending;$('view').innerHTML=r.html;}catch(e){}
+}
+setInterval(refreshShop,30000);
+async function actReceive(id){
+  try{await rpc('shop_receive_order',{p_id:id});toast('تم تسجيل استلام الطلب');}
+  catch(e){toast('تعذّر تسجيل الاستلام الآن، جرّب مرة أخرى');}
+  render();
+}
+
+/* ===== حسابات المحلات (للمالك فقط) ===== */
+async function viewStaff(){
+  var hd=header('حسابات المحلات','اربط صاحب كل محل بحسابه ليرى طلبات محله ويؤكد استلامها','#/account');
+  if(!session||!(S.isAdmin||await checkAdmin()))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لمالك التطبيق فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
+  var rows=await rpc('list_shop_staff')||[];
+  var h=hd+'<div class="g"><div class="adm"><button class="btn p" data-act="addstaff">'+icon('plus')+'ربط صاحب محل</button></div>';
+  if(!rows.length)h+='<div class="empty">لم تربط أي حساب بمحل بعد. اطلب من صاحب المحل أن ينشئ حسابه من التطبيق أولًا، ثم اربطه ببريده.</div>';
+  rows.forEach(function(r){h+='<div class="card" style="flex-direction:column;gap:8px"><div class="body"><span class="nm">'+esc(r.place_name)+'</span><span class="sc" dir="ltr" style="text-align:right">'+esc(r.email)+'</span></div><div class="adm" style="padding-top:0"><button class="btn d" data-act="rmstaff" data-id="'+esc(r.user_id)+'" data-place="'+esc(r.place_id)+'">'+icon('trash')+'إلغاء الربط</button></div></div>';});
+  return{html:h+'</div>'};
+}
+async function actAddStaff(){
+  if(!await ensureOwner())return;
+  var pls=await sel('places',{select:'id,name',order:'name.asc'})||[];
+  if(!pls.length){toast('أضف محلًا أولًا ثم اربط صاحبه');return;}
+  var ok=await formSheet({title:'ربط صاحب محل',text:'يجب أن يكون صاحب المحل قد أنشأ حسابه في التطبيق ببريده.',submit:'ربط الحساب',
+    errText:function(er){return er.noUser?'لم نجد حسابًا بهذا البريد. اطلب من صاحب المحل أن ينشئ حسابه من التطبيق أولًا.':(isDenied(er)?NOT_ALLOWED:'تعذّر الربط الآن، جرّب مرة أخرى');},
+    fields:[{id:'em',label:'بريد صاحب المحل',type:'email',ltr:true},{id:'place',label:'المحل',type:'select',value:pls[0].id,options:pls.map(function(x){return{value:x.id,label:x.name}})}],
+    validate:function(v){return /^\S+@\S+\.\S+$/.test(v.em.trim())?'':'اكتب بريدًا إلكترونيًا صحيحًا';},
+    onSubmit:async function(v){var r=await rpc('add_shop_staff',{p_email:v.em.trim(),p_place:v.place});if(r==='no_user'){var er=new Error('no_user');er.noUser=true;throw er;}}});
+  if(ok){toast('تم ربط الحساب بالمحل');render();}
+}
+async function actRmStaff(uid,pid){
+  if(!await ensureOwner())return;
+  if(!await confirmSheet('إلغاء الربط','لن يرى صاحب هذا الحساب طلبات المحل بعد الآن، ولن يُحذف حسابه.','نعم، ألغِ الربط'))return;
+  try{await api('DELETE','/rest/v1/shop_staff?user_id=eq.'+encodeURIComponent(uid)+'&place_id=eq.'+encodeURIComponent(pid),{headers:{'Prefer':'return=minimal'}});toast('تم إلغاء الربط');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الإلغاء الآن، جرّب مرة أخرى');}
+  render();
+}
+
+
+/* ===== المشاوير ===== */
+function rideWaMsg(lat,lng){return 'السلام عليكم، أحتاج مشوارًا.'+(lat!=null?'\nموقعي: https://maps.google.com/?q='+lat+','+lng:'');}
+async function rideContact(){
+  try{var r=await sel('app_settings',{select:'value',key:'eq.ride_whatsapp'});return r&&r[0]?r[0].value:'';}catch(e){return '';}
+}
+async function viewRide(){
+  var hd=header('مشوار بالقبطان','اطلب سيارة توصلك إلى أي مكان، ونتفق معك على السعر','#/');
+  var num=await rideContact(),wa=waPhone(num);
+  var h=hd+'<div class="g">';
+  if(wa){
+    h+='<div class="acc" style="margin-top:16px"><h2>تواصل معنا مباشرة</h2><p>أرسل لنا موقعك على واتساب أو اتصل بنا، وسنتفق معك على السعر.</p><div class="adm" style="padding-top:0"><a class="btn p" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(rideWaMsg(S.loc?S.loc.lat.toFixed(5):null,S.loc?S.loc.lng.toFixed(5):null))+'">'+icon('chat')+'واتساب</a><a class="btn s" href="tel:'+esc(telOf(num))+'">'+icon('phone')+'اتصال</a></div></div>';
+  }
+  if(!session){
+    h+='<div class="acc" style="margin-top:16px"><h2>أنشئ حسابك أولًا</h2><p>نحتاج اسمك ورقمك ليتواصل معك فريقنا، ولتصلك سيارتك بأمان.</p><button class="btn p block" data-act="signup">إنشاء حساب</button><button class="btn s block" data-act="login">تسجيل الدخول</button></div>';
+  }else{
+    h+='<form class="acc" id="rf" novalidate style="margin-top:16px"><h2>اطلب مشوارك</h2>'+
+      '<div class="chips">'+chip('pin','سيصلنا موقعك الحالي تلقائيًا',true)+'</div>'+
+      fieldHtml({id:'dest',label:'إلى أين تريد الذهاب؟',type:'text',hint:'مثل: محطة القطار، أو الميناء'})+
+      fieldHtml({id:'pnote',label:'علامة مميزة قرب مكانك (اختياري)',type:'text',hint:'مثل: أمام الصيدلية'})+
+      fieldHtml({id:'pax',label:'عدد الركاب',type:'select',value:'1',options:[1,2,3,4,5,6].map(function(n){return{value:String(n),label:arNum(n)}})})+
+      fieldHtml({id:'rnote',label:'ملاحظات (اختياري)',type:'textarea',hint:'مثل: معي حقائب، أو أريد الوصول قبل الساعة ٦'})+
+      '<button class="btn p block" type="submit" id="rgo">'+icon('car')+'اطلب المشوار</button>'+
+      '<p style="font-size:13px">يتواصل معك فريقنا على رقمك لنتفق على السعر وموعد وصول السيارة.</p></form>';
+  }
+  if(session&&session.user){
+    var mine=[];try{mine=await sel('rides',{select:'id,destination,created_at,driver_name,driver_car',user_id:'eq.'+session.user.id,order:'created_at.desc',limit:'3'})||[];}catch(e){}
+    if(mine.length){
+      h+='<div class="sec-head"><h2>آخر مشاويري</h2></div><div class="list">';
+      mine.forEach(function(r){h+='<div class="card" style="flex-direction:column;gap:6px"><span class="nm" style="font-weight:700">'+esc(r.destination)+'</span><span class="chips">'+chip('clock',dateAr(r.created_at))+(r.driver_name?chip('car','سائقك: '+r.driver_name,true):chip('clock','نجهّز لك سيارة، وسيتواصل معك فريقنا'))+(r.driver_car?chip('car',r.driver_car):'')+'</span></div>';});
+      h+='</div>';
+    }
+  }
+  if(S.isAdmin)h+='<div class="adm"><button class="btn s" data-act="ridenum">'+icon('phone')+'رقم واتساب المشاوير</button></div>';
+  return{html:h+'</div>',after:bindRide};
+}
+function bindRide(){
+  var f=$('rf');if(!f)return;
+  f.addEventListener('submit',async function(e){
+    e.preventDefault();
+    var dest=$('f_dest').value.trim();
+    if(dest.length<2){toast('اكتب وجهتك أولًا');return;}
+    if(!S.loc){toast('يجب منح إذن الموقع');return;}
+    var m=me(),b=$('rgo');b.disabled=true;
+    try{
+      await ins('rides',{customer_name:m.name||null,customer_phone:m.phone||null,pickup_lat:S.loc.lat,pickup_lng:S.loc.lng,pickup_note:$('f_pnote').value.trim()||null,destination:dest,passengers:+$('f_pax').value||1,note:$('f_rnote').value.trim()||null});
+      var num=await rideContact(),wa=waPhone(num);
+      setView(header('وصلنا طلبك','','#/')+'<div class="g"><div class="deny">'+patSvg()+'<div class="big">'+icon('car')+'</div><h2>وصلنا طلبك</h2><p>سيتواصل معك فريقنا قريبًا على رقمك لنتفق على السعر وموعد وصول السيارة.</p>'+
+        (wa?'<a class="btn p" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(rideWaMsg(S.loc.lat.toFixed(5),S.loc.lng.toFixed(5)))+'">'+icon('chat')+'تواصل معنا على واتساب</a>':'')+
+        '<a class="btn s" href="#/">العودة إلى الرئيسية</a></div></div>',false);
+    }catch(er){
+      b.disabled=false;
+      toast(/too_many_rides/.test(er.message||'')?'أرسلت عدة طلبات في وقت قصير، حاول بعد قليل أو تواصل معنا مباشرة':(isDenied(er)?'سجّل دخولك أولًا ثم أعد المحاولة':'تعذّر إرسال الطلب الآن، جرّب مرة أخرى'));
+    }
+  });
+}
+async function actRideNum(){
+  if(!await ensureOwner())return;
+  var cur=await rideContact();
+  var ok=await formSheet({title:'رقم واتساب المشاوير',text:'يظهر للراكب في شاشة المشاوير ليتواصل معكم مباشرة.',submit:'حفظ الرقم',
+    fields:[{id:'n',label:'الرقم',type:'text',inputmode:'tel',ltr:true,value:cur,hint:'+201000000000'}],
+    validate:function(v){return validPhone(v.n)?'':'اكتب رقمًا صحيحًا';},
+    onSubmit:function(v){return api('POST','/rest/v1/app_settings',{json:{key:'ride_whatsapp',value:westernDigits(v.n).replace(/\s/g,''),updated_at:new Date().toISOString()},headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});}});
+  if(ok){toast('تم حفظ الرقم');render();}
+}
+
+/* صندوق طلبات المشاوير: للمالك والمنسّق */
+var lastRidePending=null;
+async function ridesHtml(){
+  var hd=header('طلبات المشاوير','اتصل بالراكب أو راسله لتتفقا على السعر','#/account');
+  if(session&&!S.isAdmin&&!S.rideStaff)await checkAdmin();
+  if(!session||!(S.isAdmin||S.rideStaff))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة للمالك ولمنسّقي المشاوير فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>',pending:0};
+  var rows=await sel('rides',{select:'*',order:'created_at.desc',limit:'60'})||[];
+  var now=Date.now(),age=function(o){return now-new Date(o.created_at).getTime();};
+  var fresh=rows.filter(function(o){return !o.contacted&&age(o)<2*DAY;});
+  var done=rows.filter(function(o){return fresh.indexOf(o)<0;}).slice(0,15);
+  function card(o,isFresh){
+    var wa=waPhone(o.customer_phone),map='https://maps.google.com/?q='+o.pickup_lat+','+o.pickup_lng;
+    var msg='السلام عليكم يا '+(o.customer_name||'')+'، معك القبطان بخصوص مشوارك إلى '+o.destination+'.'+(o.driver_name?' سائقك: '+o.driver_name+(o.driver_car?'، والسيارة: '+o.driver_car:'')+'. نتفق على السعر قبل بدء المشوار.':' سنرسل لك اسم السائق ونوع السيارة ورقمها، ثم نتفق على السعر.');
+    return '<section class="acc"><h2>'+esc(o.destination)+'</h2><div class="chips">'+chip('user',o.customer_name||'راكب')+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+chip('clock',dateAr(o.created_at))+chip('tag',arNum(o.passengers)+(o.passengers===1?' راكب':' ركاب'),true)+(o.driver_name?chip('car','السائق: '+o.driver_name,true):'')+(o.driver_car?chip('car',o.driver_car):'')+'</div>'+
+      (o.pickup_note?'<p>قرب مكانه: '+esc(o.pickup_note)+'</p>':'')+(o.note?'<p>'+esc(o.note)+'</p>':'')+
+      '<div class="adm" style="padding-top:0">'+(o.customer_phone?'<a class="btn p" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(msg)+'">'+icon('chat')+'واتساب</a>':'')+'<a class="btn s" target="_blank" rel="noopener" href="'+map+'">'+icon('pin')+'موقعه</a>'+
+      '<button class="btn s" data-act="ridedriver" data-id="'+esc(o.id)+'">'+icon('user')+(o.driver_name?'تعديل السائق':'تحديد السائق')+'</button>'+
+      '<button class="btn s" data-act="ridedone" data-id="'+esc(o.id)+'" data-v="'+(isFresh?'1':'0')+'">'+(isFresh?'تم التواصل':'إعادته للجديدة')+'</button></div></section>';
+  }
+  var h=hd+'<div class="g"><div class="sec-head"><h2>طلبات جديدة</h2></div>';
+  if(!fresh.length)h+='<div class="empty" style="padding-top:0">لا توجد طلبات جديدة الآن.</div>';
+  fresh.forEach(function(o){h+=card(o,true);});
+  if(done.length){h+='<div class="sec-head"><h2>آخر الطلبات</h2></div>';done.forEach(function(o){h+=card(o,false);});}
+  h+='<p style="padding:14px 0 0;font-size:12px;color:var(--fg-2)">تتحدث هذه الشاشة كل نصف دقيقة وهي مفتوحة. علامة "تم التواصل" تظهر لفريقكم فقط، ولا يراها الراكب.</p></div>';
+  return{html:h,pending:fresh.length};
+}
+async function viewRides(){var r=await ridesHtml();lastRidePending=r.pending;return r;}
+async function refreshRides(){
+  if(route().name!=='rides'||$('scrim')||document.hidden)return;
+  try{var r=await ridesHtml();if(route().name!=='rides'||$('scrim'))return;
+    if(lastRidePending!==null&&r.pending>lastRidePending){toast('وصل طلب مشوار جديد');try{navigator.vibrate&&navigator.vibrate(200);}catch(e){}}
+    lastRidePending=r.pending;$('view').innerHTML=r.html;}catch(e){}
+}
+setInterval(refreshRides,30000);
+var ridesCache={};
+async function actRideDriver(id){
+  var o=null;try{o=(await sel('rides',{select:'id,driver_name,driver_car',id:'eq.'+id}))[0];}catch(e){}
+  var ok=await formSheet({title:'تحديد السائق',text:'يظهر اسم السائق للراكب في طلبه، ونضيفه إلى رسالتك له.',submit:'حفظ السائق',
+    errText:function(er){return isDenied(er)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى';},
+    fields:[{id:'dn',label:'اسم السائق',type:'text',value:o&&o.driver_name||''},{id:'dc',label:'السيارة ولوحتها (اختياري)',type:'text',value:o&&o.driver_car||'',hint:'مثل: سيارة بيضاء، لوحة ١٢٣٤'}],
+    validate:function(v){return v.dn.trim().length<2?'اكتب اسم السائق أولًا':'';},
+    onSubmit:function(v){return rpc('ride_set_driver',{p_id:id,p_name:v.dn.trim(),p_car:v.dc.trim()});}});
+  if(ok){toast('تم حفظ السائق');render();}
+}
+async function actRideDone(id,v){
+  try{await rpc('ride_mark_contacted',{p_id:id,p_done:v});toast(v?'تم تسجيل التواصل':'أعدناه إلى الطلبات الجديدة');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى');}
+  render();
+}
+
+/* منسّقو المشاوير (للمالك فقط) */
+async function viewRideStaff(){
+  var hd=header('منسّقو المشاوير','اربط حساب كل منسّق ليرى طلبات المشاوير ويتواصل مع الركاب','#/account');
+  if(!session||!(S.isAdmin||await checkAdmin()))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لمالك التطبيق فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
+  var rows=await rpc('list_ride_staff')||[];
+  var h=hd+'<div class="g"><div class="adm"><button class="btn p" data-act="addridestaff">'+icon('plus')+'ربط منسّق</button></div>';
+  if(!rows.length)h+='<div class="empty">لم تربط أي منسّق بعد. اطلب منه أن ينشئ حسابه من التطبيق أولًا، ثم اربطه ببريده.</div>';
+  rows.forEach(function(r){h+='<div class="card" style="flex-direction:column;gap:8px"><div class="body"><span class="sc" dir="ltr" style="text-align:right">'+esc(r.email)+'</span></div><div class="adm" style="padding-top:0"><button class="btn d" data-act="rmridestaff" data-id="'+esc(r.user_id)+'">'+icon('trash')+'إلغاء الربط</button></div></div>';});
+  return{html:h+'</div>'};
+}
+async function actAddRideStaff(){
+  if(!await ensureOwner())return;
+  var ok=await formSheet({title:'ربط منسّق مشاوير',text:'يجب أن يكون المنسّق قد أنشأ حسابه في التطبيق ببريده.',submit:'ربط الحساب',
+    errText:function(er){return er.noUser?'لم نجد حسابًا بهذا البريد. اطلب منه أن ينشئ حسابه من التطبيق أولًا.':(isDenied(er)?NOT_ALLOWED:'تعذّر الربط الآن، جرّب مرة أخرى');},
+    fields:[{id:'em',label:'بريد المنسّق',type:'email',ltr:true}],
+    validate:function(v){return /^\S+@\S+\.\S+$/.test(v.em.trim())?'':'اكتب بريدًا إلكترونيًا صحيحًا';},
+    onSubmit:async function(v){var r=await rpc('add_ride_staff',{p_email:v.em.trim()});if(r==='no_user'){var er=new Error('no_user');er.noUser=true;throw er;}}});
+  if(ok){toast('تم ربط المنسّق');render();}
+}
+async function actRmRideStaff(uid){
+  if(!await ensureOwner())return;
+  if(!await confirmSheet('إلغاء الربط','لن يرى صاحب هذا الحساب طلبات المشاوير بعد الآن، ولن يُحذف حسابه.','نعم، ألغِ الربط'))return;
+  try{await api('DELETE','/rest/v1/ride_staff?user_id=eq.'+encodeURIComponent(uid),{headers:{'Prefer':'return=minimal'}});toast('تم إلغاء الربط');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الإلغاء الآن، جرّب مرة أخرى');}
+  render();
+}
+
+/* ===== شكاوى الطلبات (للمالك فقط) ===== */
+async function viewComplaints(){
+  var hd=header('طلبات تحتاج متابعة','الزبائن الذين أبلغوا أن طلبهم لم يصل بعد','#/account');
+  if(!session||!(S.isAdmin||await checkAdmin()))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لمالك التطبيق فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
+  var all=await sel('orders',{select:'*',order:'created_at.desc',limit:'100'})||[];
+  var comp=all.filter(function(o){return o.status==='not_arrived'&&!o.complaint_handled;});
+  var arrived=all.filter(function(o){return o.status==='arrived'}).length;
+  var unc=all.filter(function(o){var a=Date.now()-new Date(o.created_at).getTime();return o.status==='sent'&&a>10*60000&&a<DAY;});
+  var h=hd+'<div class="g"><div class="chips" style="padding-top:14px">'+chip('bag','الطلبات الأخيرة: '+arNum(all.length))+chip('smile','وصلت: '+arNum(arrived))+chip('clock','تحتاج متابعة: '+arNum(comp.length),true)+chip('bag','لم يؤكدها المحل: '+arNum(unc.length))+'</div>';
+  h+='<div class="sec-head"><h2>تحتاج متابعة</h2></div>';
+  if(!comp.length)h+='<div class="empty" style="padding-top:0">لا توجد شكاوى الآن، ما شاء الله.</div>';
+  comp.forEach(function(o){
+    var wa=westernDigits(o.place_whatsapp||'').replace(/[^0-9]/g,'');
+    var msg='السلام عليكم، الزبون '+(o.customer_name||'')+' لم يصله طلبه. حاول ألا تتأخر من فضلك، شكرًا لك.';
+    h+='<section class="acc"><h2>'+esc(o.place_name)+'</h2><div class="chips">'+chip('user',o.customer_name||'زبون')+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+chip('clock',dateAr(o.created_at))+'</div>'+
+      '<p>'+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'</p><div class="adm" style="padding-top:0">'+
+      (wa?'<a class="btn p" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(msg)+'">'+icon('chat')+'نبّه المحل</a>':'')+
+      (o.customer_phone?'<a class="btn s" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل بالزبون</a>':'')+
+      '<button class="btn s" data-act="handled" data-id="'+esc(o.id)+'">تمت المتابعة</button></div></section>';
+  });
+  h+='<div class="sec-head"><h2>لم يؤكدها المحل بعد</h2></div>';
+  if(!unc.length)h+='<div class="empty" style="padding-top:0">كل الطلبات الحديثة أكّدها أصحاب المحلات.</div>';
+  unc.forEach(function(o){
+    var wa=waPhone(o.place_whatsapp),msg='السلام عليكم، لديكم طلب من الزبون '+(o.customer_name||'')+' لم يُؤكَّد استلامه في التطبيق. برجاء تأكيد الاستلام، شكرًا لك.';
+    h+='<div class="card" style="flex-direction:column;gap:6px"><span class="nm" style="font-weight:700">'+esc(o.place_name)+'</span><span class="chips">'+chip('user',o.customer_name||'زبون')+chip('clock',dateAr(o.created_at))+'</span>'+(wa?'<div class="adm" style="padding-top:4px"><a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(msg)+'">'+icon('chat')+'نبّه المحل</a></div>':'')+'</div>';
+  });
+  h+='<div class="sec-head"><h2>آخر الطلبات</h2></div><div class="list">';
+  all.slice(0,20).forEach(function(o){h+='<div class="card" style="flex-direction:column;gap:6px"><span class="nm" style="font-weight:700">'+esc(o.place_name)+'</span><span class="chips">'+chip('user',o.customer_name||'زبون')+chip('tag',arPrice(o.total),true)+chip('clock',dateAr(o.created_at))+'</span></div>';});
+  if(!all.length)h+='<div class="empty" style="padding-top:0">لم يصل أي طلب مسجّل بعد.</div>';
+  return{html:h+'</div></div>'};
+}
+async function actHandled(id){
+  if(!await ensureOwner())return;
+  try{await upd('orders',id,{complaint_handled:true});toast('تم تسجيل المتابعة');}catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى');}
+  render();
+}
+
+/* ===== التواصل مع محبين آخرين ===== */
+var posts=[],postsFailed=false;
+async function viewCommunity(){
+  var tok=++renderTok;
+  setView(loading(),true);setActiveTab('community');
+  try{posts=await sel('posts',{select:'id,user_id,author_name,body,created_at',order:'created_at.desc',limit:'30'})||[];postsFailed=false;}catch(e){posts=[];postsFailed=true;}
+  if(tok!==renderTok)return;
+  var uid=session&&session.user?session.user.id:null;
+  var h='<header class="hdr">'+patSvg()+'<div class="hdr-top"><h1 style="padding:8px 12px">التواصل مع محبين آخرين</h1></div><div class="sub">شاركنا رأيك أو اقتراحك، واقرأ ما يكتبه محبّو القبطان.</div></header><div class="g">';
+  if(session){
+    h+='<form class="acc" id="pf" novalidate><div class="field"><label for="pbody">اكتب مشاركتك</label><textarea id="pbody" maxlength="280" placeholder="مثل: جرّبت مكانًا رائعًا، وأنصحكم به"></textarea><span class="hint" id="pcnt">٢٨٠ حرفًا متبقية</span></div><button class="btn p block" type="submit" id="pgo">نشر المشاركة</button></form>';
+  }else{
+    h+='<div class="acc"><h2>انضم إلى المحبين</h2><p>أنشئ حسابك لتشاركنا رأيك، ويمكنك القراءة دون حساب.</p><button class="btn p block" data-act="signup">إنشاء حساب</button><button class="btn s block" data-act="login">تسجيل الدخول</button></div>';
+  }
+  h+='<div class="sec-head"><h2>آخر المشاركات</h2></div>';
+  if(postsFailed)h+=failedHtml('تعذّر تحميل المشاركات الآن، جرّب مرة أخرى بعد قليل.');
+  else if(!posts.length)h+='<div class="empty" style="padding-top:0">كن أول من يشاركنا، وستظهر مشاركتك هنا.</div>';
+  else{
+    h+='<div class="list">';
+    posts.forEach(function(x){
+      var mine=uid&&x.user_id===uid;
+      h+='<article class="card" style="flex-direction:column;gap:6px"><span class="nm" style="font-weight:700">'+esc(x.author_name)+'</span><p style="margin:0;line-height:1.9">'+nl2br(x.body)+'</p><span class="chips">'+chip('clock',dateAr(x.created_at))+'</span>'+
+        ((mine||S.isAdmin)?'<button class="btn d" style="min-height:36px;padding:0 12px;font-size:13px;align-self:flex-start" data-act="delpost" data-id="'+esc(x.id)+'">'+icon('trash')+'حذف</button>':'')+'</article>';
+    });
+    h+='</div>';
+  }
+  setView(h+'</div>',true);setActiveTab('community');
+  var f=$('pf');
+  if(f){
+    var ta=$('pbody');
+    ta.addEventListener('input',function(){$('pcnt').textContent=arNum(280-ta.value.length)+' حرفًا متبقية';});
+    f.addEventListener('submit',async function(e){
+      e.preventDefault();var v=ta.value.trim();
+      if(!v){toast('اكتب مشاركتك أولًا');return;}
+      var b=$('pgo');b.disabled=true;b.textContent='جاري النشر';
+      try{await ins('posts',{body:v});toast('تم نشر مشاركتك، شكرًا لك');viewCommunity();}
+      catch(er){b.disabled=false;b.textContent='نشر المشاركة';toast('تعذّر النشر الآن، جرّب مرة أخرى');}
+    });
+  }
+}
+async function actDelPost(id){
+  if(!await confirmSheet('حذف المشاركة','هل تريد حذف هذه المشاركة؟','نعم، احذف'))return;
+  try{await del('posts',id);toast('تم حذف المشاركة');viewCommunity();}catch(e){toast('تعذّر الحذف الآن');}
+}
+
+/* ===== حسابي ===== */
+async function viewAccount(){
+  setView(loading(),true);
+  if(session&&!S.isAdmin)await checkAdmin();
+  var h='<header class="hdr">'+patSvg()+'<div class="hdr-top"><h1 style="padding:8px 12px">حسابي</h1></div></header><div class="g">';
+  if(session){
+    var m=me();
+    h+='<div class="acc"><h2>'+esc(m.name?('أهلًا بك يا '+m.name):'أهلًا بك في القبطان')+'</h2>'+
+      '<div class="chips">'+(m.phone?chip('phone',arNum(m.phone)):'')+chip('chat',m.email)+(S.isAdmin?chip('lock','مالك التطبيق',true):'')+'</div>'+
+      '<p>نضيف اسمك ورقمك تلقائيًا إلى رسالة الطلب حتى يتواصل معك المحل بسهولة.</p>'+
+      '<button class="btn s block" data-act="editprofile">'+icon('edit')+'تعديل بياناتي</button>'+
+      '<button class="btn d block" data-act="logout">تسجيل الخروج</button></div>';
+    if(S.isAdmin)h+='<div class="acc"><h2>أنت مسجّل كمالك</h2><p>يمكنك إضافة المحلات والأقسام والمنتجات وتعديلها من شاشاتها مباشرة.</p><a class="btn s block" href="#/taxonomy">'+icon('tag')+'إدارة الأصناف والفئات</a><a class="btn s block" href="#/complaints">'+icon('bag')+'طلبات تحتاج متابعة</a><a class="btn s block" href="#/staff">'+icon('user')+'حسابات المحلات</a><a class="btn s block" href="#/rides">'+icon('car')+'طلبات المشاوير</a><a class="btn s block" href="#/ridestaff">'+icon('user')+'منسّقو المشاوير</a></div>';
+    if(S.rideStaff&&!S.isAdmin)h+='<div class="acc"><h2>منسّق المشاوير</h2><p>تصلك هنا طلبات المشاوير، وتتواصل مع الراكب لتتفقا على السعر.</p><a class="btn p block" href="#/rides">'+icon('car')+'طلبات المشاوير</a></div>';
+    if(S.shops.length)h+='<div class="acc"><h2>حساب محل</h2><div class="chips">'+S.shops.map(function(x){return chip('tag',x.name,true)}).join('')+'</div><p>تصلك هنا طلبات محلك، وتؤكد استلامها بضغطة واحدة.</p><a class="btn p block" href="#/shoporders">'+icon('bag')+'الطلبات الواردة</a></div>';
+  }else{
+    h+='<div class="acc"><h2>أهلًا بك في القبطان</h2><p>أنشئ حسابك لتحفظ اسمك ورقمك، فيصل طلبك إلى المحل أسرع وأسهل.</p>'+
+      '<button class="btn p block" data-act="signup">إنشاء حساب</button>'+
+      '<button class="btn s block" data-act="login">تسجيل الدخول</button></div>';
+  }
+  setView(h+'</div>',true);
+  setActiveTab('account');
+}
+function validPhone(v){var d=westernDigits(v).replace(/[^0-9]/g,'');return d.length>=10&&d.length<=15;}
+async function actSignup(){
+  var result=null;
+  var ok=await formSheet({title:'إنشاء حساب',text:'نحتاج اسمك ورقمك ليتواصل معك المحل عند الطلب.',submit:'إنشاء الحساب',
+    errText:function(er){return er.status===429?'حاول بعد قليل من فضلك':er.status===422?'هذا البريد مسجّل من قبل، جرّب تسجيل الدخول':'تعذّر إنشاء الحساب الآن، جرّب مرة أخرى';},
+    fields:[{id:'name',label:'الاسم',type:'text'},{id:'phone',label:'رقم الموبايل',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000'},{id:'em',label:'البريد الإلكتروني',type:'email',ltr:true},{id:'pw',label:'كلمة المرور (٦ أحرف على الأقل)',type:'password',ltr:true}],
+    validate:function(v){if(!v.name.trim())return 'اكتب اسمك أولًا';if(!validPhone(v.phone))return 'اكتب رقم موبايل صحيحًا';if(!/^\S+@\S+\.\S+$/.test(v.em.trim()))return 'اكتب بريدًا إلكترونيًا صحيحًا';if(v.pw.length<6)return 'كلمة المرور قصيرة، اكتب ٦ أحرف على الأقل';return '';},
+    onSubmit:async function(v){
+      var j=await api('POST','/auth/v1/signup',{json:{email:v.em.trim(),password:v.pw,data:{name:v.name.trim(),phone:westernDigits(v.phone).replace(/\s/g,'')}}});
+      result=j&&j.access_token?'in':'confirm';
+      if(result==='in')saveSession(sessFrom(j));
+    }});
+  if(!ok)return;
+  if(result==='in'){toast('أهلًا بك في القبطان');await checkAdmin();}
+  else toast('أرسلنا رسالة تأكيد إلى بريدك، افتحها ثم سجّل دخولك');
+  render();
+}
+async function actEditProfile(){
+  var m=me();
+  var ok=await formSheet({title:'تعديل بياناتي',submit:'حفظ التعديل',
+    errText:function(){return 'تعذّر الحفظ الآن، جرّب مرة أخرى';},
+    fields:[{id:'name',label:'الاسم',type:'text',value:m.name},{id:'phone',label:'رقم الموبايل',type:'text',inputmode:'tel',ltr:true,value:m.phone}],
+    validate:function(v){if(!v.name.trim())return 'اكتب اسمك أولًا';if(!validPhone(v.phone))return 'اكتب رقم موبايل صحيحًا';return '';},
+    onSubmit:async function(v){
+      var u=await api('PUT','/auth/v1/user',{json:{data:{name:v.name.trim(),phone:westernDigits(v.phone).replace(/\s/g,'')}}});
+      saveSession(Object.assign({},session,{user:u}));
+    }});
+  if(ok){toast('تم حفظ بياناتك');render();}
+}
+
+/* ===== النماذج السفلية ===== */
+function closeSheet(){var s=document.getElementById('scrim');if(s)s.remove();document.removeEventListener('keydown',escClose);}
+function escClose(e){if(e.key==='Escape'){closeSheet();if(pending){pending(false);pending=null;}}}
+var pending=null;
+function openSheet(inner,mid,resolve){
+  closeSheet();
+  var w=document.createElement('div');w.id='scrim';w.className='scrim'+(mid?' mid':'');w.setAttribute('role','dialog');w.setAttribute('aria-modal','true');
+  w.innerHTML='<div class="sheet">'+(mid?'':'<div class="grab"></div>')+inner+'</div>';
+  document.body.appendChild(w);
+  pending=resolve||null;
+  w.addEventListener('click',function(e){if(e.target===w){closeSheet();if(pending){pending(false);pending=null;}}});
+  document.addEventListener('keydown',escClose);
+  var f=w.querySelector('input:not([type=file]),select,textarea,button');if(f&&!mid)try{f.focus({preventScroll:true})}catch(e){}
+  return w;
+}
+function fieldHtml(f){
+  var id='f_'+f.id,h='<div class="field">';
+  if(f.type==='select'){h+='<label for="'+id+'">'+esc(f.label)+'</label><select id="'+id+'">'+f.options.map(function(o){return '<option value="'+esc(o.value)+'"'+(String(o.value)===String(f.value)?' selected':'')+'>'+esc(o.label)+'</option>'}).join('')+'</select>';}
+  else if(f.type==='textarea'){h+='<label for="'+id+'">'+esc(f.label)+'</label><textarea id="'+id+'" placeholder="'+esc(f.hint||'')+'">'+esc(f.value||'')+'</textarea>';}
+  else{h+='<label for="'+id+'">'+esc(f.label)+'</label><input id="'+id+'" type="'+(f.type==='email'||f.type==='password'?f.type:'text')+'" '+(f.inputmode?'inputmode="'+f.inputmode+'" ':'')+(f.ltr?'class="ltr" dir="ltr" ':'')+(f.type==='email'?'autocomplete="username" ':f.type==='password'?'autocomplete="current-password" ':'')+'value="'+esc(f.value==null?'':f.value)+'" placeholder="'+esc(f.hint||'')+'">';}
+  return h+'</div>';
+}
+function fileToJpeg(file,max){
+  return new Promise(function(res,rej){
+    var img=new Image(),url=URL.createObjectURL(file);
+    img.onload=function(){var s=Math.min(1,max/Math.max(img.width,img.height));var c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*s));c.height=Math.max(1,Math.round(img.height*s));c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);c.toBlob(function(b){b?res(b):rej(new Error('blob'))},'image/jpeg',0.82);};
+    img.onerror=function(){URL.revokeObjectURL(url);rej(new Error('img'));};
+    img.src=url;
+  });
+}
+/* نموذج عام: حقول، وصورة اختيارية بين الحقول، وزر حفظ */
+function formSheet(o){
+  return new Promise(function(resolve){
+    var blob=null,inner='<h2>'+esc(o.title)+'</h2>'+(o.text?'<p>'+esc(o.text)+'</p>':'')+'<form id="sf" novalidate>';
+    o.fields.forEach(function(f){
+      if(f.type==='image'){
+        inner+='<div class="field"><span class="lbl">'+esc(f.label)+'</span><div class="imgbox" id="imgBox">'+(f.url?'<img alt="" src="'+esc(f.url)+'">':'<div class="ph">'+icon('image')+'<span>لم تُضف صورة بعد</span></div>')+'</div>'+
+          '<div class="row2"><button type="button" class="btn s" id="btnCam">'+icon('camera')+'التقاط صورة</button><button type="button" class="btn s" id="btnGal">'+icon('image')+'من المعرض</button></div>'+
+          '<input type="file" id="fileCam" accept="image/*" capture="environment" hidden><input type="file" id="fileGal" accept="image/*" hidden></div>';
+      }else inner+=fieldHtml(f);
+    });
+    inner+='<div class="acts"><button class="btn p block" type="submit" id="sfGo">'+esc(o.submit)+'</button><button class="btn s block" type="button" id="sfNo">إلغاء</button></div></form>';
+    var w=openSheet(inner,false,resolve);
+    function done(v){closeSheet();pending=null;resolve(v);}
+    $('sfNo').addEventListener('click',function(){done(false);});
+    if($('btnCam')){
+      var pick=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;fileToJpeg(f,1600).then(function(b){blob=b;var box=$('imgBox');box.innerHTML='';var im=document.createElement('img');im.alt='';im.src=URL.createObjectURL(b);box.appendChild(im);}).catch(function(){toast('تعذّر قراءة الصورة، جرّب صورة أخرى');});};
+      $('btnCam').addEventListener('click',function(){$('fileCam').click();});
+      $('btnGal').addEventListener('click',function(){$('fileGal').click();});
+      $('fileCam').addEventListener('change',pick);$('fileGal').addEventListener('change',pick);
+    }
+    $('sf').addEventListener('submit',async function(e){
+      e.preventDefault();
+      var vals={};o.fields.forEach(function(f){if(f.type!=='image')vals[f.id]=$('f_'+f.id).value;});
+      var err=o.validate&&o.validate(vals);if(err){toast(err);return;}
+      var b=$('sfGo');b.disabled=true;b.textContent='جاري الحفظ';
+      try{await o.onSubmit(vals,blob);done(true);}
+      catch(er){b.disabled=false;b.textContent=o.submit;toast(o.errText?o.errText(er):(isDenied(er)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى'));}
+    });
+  });
+}
+function confirmSheet(title,text,ok,soft){
+  return new Promise(function(resolve){
+    openSheet('<h2>'+esc(title)+'</h2><p>'+esc(text)+'</p><div class="acts"><button class="btn '+(soft?'p':'d')+' block" id="cfOk" style="margin-top:12px">'+esc(ok)+'</button><button class="btn s block" id="cfNo">إلغاء</button></div>',true,resolve);
+    $('cfOk').addEventListener('click',function(){closeSheet();pending=null;resolve(true);});
+    $('cfNo').addEventListener('click',function(){closeSheet();pending=null;resolve(false);});
+  });
+}
+function loginSheet(owner){
+  return new Promise(function(resolve){
+    var w=openSheet('<h2>'+(owner?'دخول المالك':'تسجيل الدخول')+'</h2><p>'+(owner?'إضافة المحلات والأقسام والمنتجات متاحة لصاحب التطبيق فقط.':'أهلًا بعودتك، ادخل ببريدك وكلمة مرورك.')+'</p><form id="lf" novalidate>'+
+      fieldHtml({id:'em',label:'البريد الإلكتروني',type:'email',ltr:true})+fieldHtml({id:'pw',label:'كلمة المرور',type:'password',ltr:true})+
+      '<div class="acts"><button class="btn p block" type="submit" id="lgGo">دخول</button><button class="btn s block" type="button" id="lgNo">إلغاء</button></div></form>',false,resolve);
+    $('lgNo').addEventListener('click',function(){closeSheet();pending=null;resolve(false);});
+    $('lf').addEventListener('submit',async function(e){
+      e.preventDefault();var b=$('lgGo');b.disabled=true;b.textContent='جاري الدخول';
+      try{
+        var res=await fetch(BASE+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('f_em').value.trim(),password:$('f_pw').value})});
+        if(!res.ok)throw new Error('login');
+        var j=await res.json();
+        saveSession(sessFrom(j));
+        closeSheet();pending=null;resolve(true);
+      }catch(er){closeSheet();pending=null;toast(owner?NOT_ALLOWED:'تعذّر الدخول، تأكد من البريد وكلمة المرور');resolve(false);}
+    });
+  });
+}
+/* بوابة المالك: غير المالك تظهر له "عذرا لايمكن الإضافة"، وقاعدة البيانات نفسها ترفض كتابته أصلًا */
+async function ensureOwner(){
+  if(!session){var ok=await loginSheet(true);if(!ok)return false;}
+  var admin=await checkAdmin();
+  if(!admin){toast(NOT_ALLOWED);return false;}
+  return true;
+}
+
+/* ===== إجراءات المالك ===== */
+function placeFields(p){
+  return [
+    {id:'name',label:'اسم المحل',type:'text',value:p.name||''},
+    {id:'cat',label:'نوع المحل',type:'select',value:p.category_id,options:S.cats.map(function(c){return{value:c.id,label:c.label}})},
+    {id:'wa',label:'رقم الواتس الخاص بالمحل',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000',value:p.whatsapp||''},
+    {id:'prep',label:'زمن تجهيز الطلب بالدقائق',type:'text',inputmode:'numeric',value:arNum(p.prep_minutes==null?15:p.prep_minutes)},
+    {id:'lat',label:'خط العرض',type:'text',inputmode:'decimal',ltr:true,value:p.lat==null?'':arNum(Number(p.lat).toFixed(5))},
+    {id:'lng',label:'خط الطول',type:'text',inputmode:'decimal',ltr:true,value:p.lng==null?'':arNum(Number(p.lng).toFixed(5))}
+  ];
+}
+function placeRow(v){return{name:v.name.trim(),category_id:v.cat,whatsapp:westernDigits(v.wa).replace(/\s/g,'')||null,prep_minutes:Math.round(num(v.prep)),lat:num(v.lat),lng:num(v.lng)};}
+function placeValidate(v){
+  if(!v.name.trim())return 'اكتب اسم المحل أولًا';
+  if(!v.cat)return 'اختر نوع المحل';
+  if(num(v.prep)===null||num(v.lat)===null||num(v.lng)===null)return 'تأكد من كتابة زمن التجهيز والموقع بالأرقام';
+  return '';
+}
+async function actAddPlace(){
+  if(!await ensureOwner())return;
+  if(!S.cats.length){toast('لا توجد أنواع محلات بعد');return;}
+  var c=S.cats[S.catIdx]||S.cats[0];
+  var ok=await formSheet({title:'إضافة محل',submit:'حفظ المحل',validate:placeValidate,
+    fields:placeFields({category_id:c.id,prep_minutes:15,lat:S.loc&&S.loc.lat,lng:S.loc&&S.loc.lng}),
+    onSubmit:async function(v){await ins('places',placeRow(v));}});
+  if(ok){toast('تمت إضافة المحل');loadHome();}
+}
+async function actEditPlace(id){
+  if(!await ensureOwner())return;
+  var pl=window.__place;if(!pl||pl.id!==id)return;
+  var ok=await formSheet({title:'تعديل المحل',submit:'حفظ التعديل',validate:placeValidate,fields:placeFields(pl),
+    onSubmit:async function(v){await upd('places',id,placeRow(v));}});
+  if(ok){toast('تم حفظ التعديل');render();loadPlacesQuiet();}
+}
+async function actDelPlace(id){
+  if(!await ensureOwner())return;
+  if(!await confirmSheet('حذف المحل','سيُحذف المحل وكل أقسامه ومنتجاته. هل تريد المتابعة؟','نعم، احذف'))return;
+  try{await del('places',id);toast('تم حذف المحل');location.hash='#/';loadHome();}catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحذف الآن');}
+}
+async function loadPlacesQuiet(){try{S.places=await rpc('places_near',{p_lat:S.loc.lat,p_lng:S.loc.lng})||[];}catch(e){}}
+async function actAddSection(placeId,n){
+  if(!await ensureOwner())return;
+  var ok=await formSheet({title:'إضافة قسم',submit:'حفظ القسم',validate:function(v){return v.name.trim()?'':'اكتب اسم القسم أولًا';},
+    fields:[{id:'name',label:'اسم القسم',type:'text',hint:'مثل: المشروبات'}],
+    onSubmit:async function(v){await ins('sections',{place_id:placeId,name:v.name.trim(),sort_order:n});}});
+  if(ok){toast('تمت إضافة القسم');render();loadPlacesQuiet();}
+}
+async function actDelSection(id,placeId){
+  if(!await ensureOwner())return;
+  if(!await confirmSheet('حذف القسم','سيُحذف القسم وكل منتجاته. هل تريد المتابعة؟','نعم، احذف'))return;
+  try{await del('sections',id);toast('تم حذف القسم');location.hash='#/place/'+encodeURIComponent(placeId);loadPlacesQuiet();}catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحذف الآن');}
+}
+
+/* ===== إدارة الأصناف والفئات (للمالك فقط) ===== */
+function arItems(n){return n===0?'لا أصناف':n===1?'صنف واحد':n===2?'صنفان':n<=10?arNum(n)+' أصناف':arNum(n)+' صنفًا';}
+function taxErr(what){return function(er){return er.code==='23505'||/duplicate|unique/i.test(er.message||'')?('يوجد '+what+' بهذا الاسم بالفعل، اختر اسمًا آخر'):(isDenied(er)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى');};}
+async function viewTaxonomy(){
+  var hd=header('إدارة الأصناف والفئات','الصنف يربط المنتج نفسه بين المحلات، والفئة تجمع الأصناف المتقاربة','#/account');
+  if(!session||!(S.isAdmin||await checkAdmin()))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لمالك التطبيق فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
+  var cat=await loadCatalog(),prods=await sel('products',{select:'id,item_id'});
+  var cnt={};(prods||[]).forEach(function(p){if(p.item_id)cnt[p.item_id]=(cnt[p.item_id]||0)+1;});
+  var h=hd+'<div class="g"><div class="adm"><button class="btn p" data-act="addfam">'+icon('plus')+'إضافة فئة</button><button class="btn s" data-act="additem">'+icon('plus')+'إضافة صنف</button></div>';
+  if(!cat.families.length)h+='<div class="empty">لا توجد فئات بعد. ابدأ بإضافة فئة مثل: الجبن أو البسكويت.</div>';
+  cat.families.forEach(function(f){
+    var its=cat.items.filter(function(i){return i.family_id===f.id;});
+    h+='<section class="acc"><h2>'+esc(f.name)+'</h2><div class="chips">'+chip('tag',arItems(its.length),true)+'</div>'+
+      '<div class="adm" style="padding-top:0"><button class="btn s" data-act="renfam" data-id="'+esc(f.id)+'">'+icon('edit')+'إعادة تسمية الفئة</button><button class="btn d" data-act="delfam" data-id="'+esc(f.id)+'">'+icon('trash')+'حذف الفئة</button></div>';
+    its.forEach(function(i){
+      var n=cnt[i.id]||0;
+      h+='<div class="card" style="flex-direction:column;gap:8px"><div class="body"><span class="nm">'+esc(i.name)+'</span><span class="sc">'+esc(arProducts(n))+(n===1?' مرتبط بهذا الصنف':n===2?' مرتبطان بهذا الصنف':n?' مرتبطة بهذا الصنف':'')+'</span></div>'+
+        '<div class="adm" style="padding-top:0"><button class="btn s" data-act="reniem" data-id="'+esc(i.id)+'">'+icon('edit')+'إعادة تسمية</button><button class="btn s" data-act="moveitem" data-id="'+esc(i.id)+'">'+icon('tag')+'نقل لفئة أخرى</button><button class="btn d" data-act="delitem" data-id="'+esc(i.id)+'">'+icon('trash')+'حذف</button></div></div>';
+    });
+    if(!its.length)h+='<p>لا أصناف في هذه الفئة، يمكنك حذفها أو إضافة صنف إليها.</p>';
+    h+='</section>';
+  });
+  return{html:h+'</div>'};
+}
+function dupName(list,name,exceptId,famId){var k=norm(name);return list.some(function(x){return x.id!==exceptId&&norm(x.name)===k&&(famId===undefined||x.family_id===famId);});}
+async function actAddFam(){
+  if(!await ensureOwner())return;var cat=await loadCatalog();
+  var ok=await formSheet({title:'إضافة فئة',submit:'حفظ الفئة',errText:taxErr('فئة'),fields:[{id:'name',label:'اسم الفئة',type:'text',hint:'مثل: الجبن'}],
+    validate:function(v){if(!v.name.trim())return 'اكتب اسم الفئة أولًا';if(dupName(cat.families,v.name,null))return 'يوجد فئة بهذا الاسم بالفعل';return '';},
+    onSubmit:function(v){return ins('families',{name:v.name.trim()});}});
+  if(ok){toast('تمت إضافة الفئة');render();}
+}
+async function actAddItem(){
+  if(!await ensureOwner())return;var cat=await loadCatalog();
+  if(!cat.families.length){toast('أضف فئة أولًا ثم أضف الصنف إليها');return;}
+  var ok=await formSheet({title:'إضافة صنف',submit:'حفظ الصنف',errText:taxErr('صنف في هذه الفئة'),
+    fields:[{id:'name',label:'اسم الصنف',type:'text',hint:'مثل: جبنة رومي'},{id:'fam',label:'الفئة',type:'select',value:cat.families[0].id,options:cat.families.map(function(x){return{value:x.id,label:x.name};})}],
+    validate:function(v){if(!v.name.trim())return 'اكتب اسم الصنف أولًا';if(dupName(cat.items,v.name,null,v.fam))return 'يوجد صنف بهذا الاسم في هذه الفئة';return '';},
+    onSubmit:function(v){return ins('items',{name:v.name.trim(),family_id:v.fam});}});
+  if(ok){toast('تمت إضافة الصنف');render();}
+}
+async function actRenFam(id){
+  if(!await ensureOwner())return;var cat=await loadCatalog(),f=cat.families.filter(function(x){return x.id===id})[0];if(!f){render();return;}
+  var ok=await formSheet({title:'إعادة تسمية الفئة',submit:'حفظ الاسم',errText:taxErr('فئة'),fields:[{id:'name',label:'اسم الفئة',type:'text',value:f.name}],
+    validate:function(v){if(!v.name.trim())return 'اكتب اسم الفئة أولًا';if(dupName(cat.families,v.name,id))return 'يوجد فئة بهذا الاسم بالفعل';return '';},
+    onSubmit:function(v){return upd('families',id,{name:v.name.trim()});}});
+  if(ok){toast('تم تعديل اسم الفئة');render();}
+}
+async function actDelFam(id){
+  if(!await ensureOwner())return;var cat=await loadCatalog(),f=cat.families.filter(function(x){return x.id===id})[0];if(!f){render();return;}
+  var n=cat.items.filter(function(i){return i.family_id===id}).length;
+  if(n){await confirmSheet('الفئة بها أصناف','فئة «'+f.name+'» بها '+arItems(n)+'. انقل هذه الأصناف إلى فئة أخرى أو احذفها أولًا، ثم احذف الفئة. لن نحذف شيئًا دون علمك.','حسنًا',true);return;}
+  if(!await confirmSheet('حذف الفئة','سيتم حذف فئة «'+f.name+'». لا تحتوي على أصناف، ولن يتأثر أي منتج.','نعم، احذف الفئة'))return;
+  try{await del('families',id);toast('تم حذف الفئة');}catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحذف الآن، جرّب مرة أخرى');}
+  render();
+}
+async function actRenItem(id){
+  if(!await ensureOwner())return;var cat=await loadCatalog(),i=cat.items.filter(function(x){return x.id===id})[0];if(!i){render();return;}
+  var ok=await formSheet({title:'إعادة تسمية الصنف',text:'المنتجات المرتبطة به تبقى مرتبطة، ويتغير الاسم فقط.',submit:'حفظ الاسم',errText:taxErr('صنف في هذه الفئة'),fields:[{id:'name',label:'اسم الصنف',type:'text',value:i.name}],
+    validate:function(v){if(!v.name.trim())return 'اكتب اسم الصنف أولًا';if(dupName(cat.items,v.name,id,i.family_id))return 'يوجد صنف بهذا الاسم في هذه الفئة';return '';},
+    onSubmit:function(v){return upd('items',id,{name:v.name.trim()});}});
+  if(ok){toast('تم تعديل اسم الصنف');render();}
+}
+async function actMoveItem(id){
+  if(!await ensureOwner())return;var cat=await loadCatalog(),i=cat.items.filter(function(x){return x.id===id})[0];if(!i){render();return;}
+  var ok=await formSheet({title:'نقل الصنف إلى فئة أخرى',text:'ستظهر بدائل هذا الصنف عند عدم الإعجاب من الفئة الجديدة.',submit:'نقل الصنف',errText:taxErr('صنف في الفئة الجديدة'),
+    fields:[{id:'fam',label:'الفئة الجديدة',type:'select',value:i.family_id,options:cat.families.map(function(x){return{value:x.id,label:x.name};})}],
+    validate:function(v){if(v.fam===i.family_id)return 'هذا الصنف في هذه الفئة بالفعل';if(dupName(cat.items,i.name,id,v.fam))return 'يوجد صنف بنفس الاسم في الفئة الجديدة';return '';},
+    onSubmit:function(v){return upd('items',id,{family_id:v.fam});}});
+  if(ok){toast('تم نقل الصنف');render();}
+}
+async function actDelItem(id){
+  if(!await ensureOwner())return;var cat=await loadCatalog(),i=cat.items.filter(function(x){return x.id===id})[0];if(!i){render();return;}
+  var pr=await sel('products',{select:'id',item_id:'eq.'+id}),n=(pr||[]).length;
+  var msg=n?('سيتم حذف صنف «'+i.name+'». ستبقى '+arProducts(n)+' كما هي، لكنها تصبح غير مرتبطة بصنف إلى أن تربطها بصنف آخر.'):('سيتم حذف صنف «'+i.name+'». لا توجد منتجات مرتبطة به.');
+  if(!await confirmSheet('حذف الصنف',msg,'نعم، احذف الصنف'))return;
+  try{await del('items',id);toast('تم حذف الصنف');}catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحذف الآن، جرّب مرة أخرى');}
+  render();
+}
+async function loadCatalog(){
+  var r=await Promise.all([sel('families',{select:'id,name',order:'name.asc'}),sel('items',{select:'id,name,family_id,families(name)',order:'name.asc'})]);
+  return{families:r[0]||[],items:r[1]||[]};
+}
+function productFields(p,cat){
+  var f=[
+    {id:'name',label:'اسم المنتج',type:'text',value:p.name||''},
+    {type:'image',label:'صورة المنتج',url:imgUrl(p.image_path)},
+    {id:'feat',label:'مميزات المنتج',type:'textarea',hint:'اكتب مميزات المنتج هنا',value:p.features||''},
+    {id:'price',label:'سعر المنتج بالجنيه',type:'text',inputmode:'decimal',value:p.price==null?'':arNum(p.price)}
+  ];
+  if(cat){
+    f.push({id:'item',label:'الصنف: به يظهر هذا المنتج في المحلات الأخرى عند الإعجاب',type:'select',value:p.item_id||'',options:[{value:'',label:'بدون ربط'}].concat(cat.items.map(function(i){return{value:i.id,label:(i.families?i.families.name+' › ':'')+i.name};}))});
+    f.push({id:'newitem',label:'أو اكتب اسم صنف جديد',type:'text',hint:'مثل: جبنة رومي'});
+    f.push({id:'fam',label:'فئة الصنف الجديد: منها تظهر البدائل عند عدم الإعجاب',type:'select',value:'',options:[{value:'',label:'اختر الفئة'}].concat(cat.families.map(function(x){return{value:x.id,label:x.name};}))});
+    f.push({id:'newfam',label:'أو اكتب اسم فئة جديدة',type:'text',hint:'مثل: الجبن'});
+  }
+  return f;
+}
+function productValidate(v){
+  if(!v.name.trim())return 'اكتب اسم المنتج أولًا';
+  if(v.price.trim()&&num(v.price)===null)return 'اكتب السعر بالأرقام فقط';
+  if((v.newitem||'').trim()&&!(v.fam||'')&&!(v.newfam||'').trim())return 'اختر فئة الصنف الجديد أو اكتب اسمها';
+  return '';
+}
+/* يحدد الصنف المختار أو ينشئ الصنف والفئة الجديدين عند الحاجة، ويتجنب التكرار بمقارنة الأسماء بعد التطبيع */
+async function resolveItem(v,cat){
+  var nit=(v.newitem||'').trim();
+  if(!nit)return v.item||null;
+  var fid=v.fam||'',nf=(v.newfam||'').trim();
+  if(nf){
+    var fk=norm(nf),ef=cat.families.filter(function(f){return norm(f.name)===fk})[0];
+    if(ef)fid=ef.id;else{var nfm=await insRet('families',{name:nf});fid=nfm.id;cat.families.push(nfm);}
+  }
+  var ik=norm(nit),ei=cat.items.filter(function(i){return i.family_id===fid&&norm(i.name)===ik})[0];
+  if(ei)return ei.id;
+  var ni=await insRet('items',{family_id:fid,name:nit});cat.items.push(ni);return ni.id;
+}
+async function actAddProduct(sectionId){
+  if(!await ensureOwner())return;
+  var cat=null;try{cat=await loadCatalog();}catch(e){}
+  var ok=await formSheet({title:'إضافة منتج',submit:'حفظ المنتج',validate:productValidate,fields:productFields({},cat),
+    onSubmit:async function(v,blob){
+      var path=null;if(blob)path=await uploadImage(blob);
+      try{
+        var row={section_id:sectionId,name:v.name.trim(),features:v.feat.trim()||null,price:v.price.trim()?num(v.price):null,image_path:path};
+        if(cat)row.item_id=await resolveItem(v,cat);
+        await ins('products',row);
+      }catch(e){removeImage(path);throw e;}
+    }});
+  if(ok){toast('تمت إضافة المنتج');render();}
+}
+async function actEditProduct(){
+  if(!await ensureOwner())return;
+  var p=cur.product;if(!p)return;
+  var cat=null;try{cat=await loadCatalog();}catch(e){}
+  var ok=await formSheet({title:'تعديل المنتج',submit:'حفظ التعديل',validate:productValidate,fields:productFields(p,cat),
+    onSubmit:async function(v,blob){
+      var row={name:v.name.trim(),features:v.feat.trim()||null,price:v.price.trim()?num(v.price):null},path=null;
+      if(blob){path=await uploadImage(blob);row.image_path=path;}
+      try{
+        if(cat)row.item_id=await resolveItem(v,cat);
+        await upd('products',p.id,row);
+      }catch(e){removeImage(path);throw e;}
+      if(path&&p.image_path)removeImage(p.image_path);
+    }});
+  if(ok){toast('تم حفظ التعديل');render();}
+}
+async function actDelProduct(){
+  if(!await ensureOwner())return;
+  var p=cur.product;if(!p)return;
+  if(!await confirmSheet('حذف المنتج','هل تريد حذف هذا المنتج؟','نعم، احذف'))return;
+  try{await del('products',p.id);removeImage(p.image_path);toast('تم حذف المنتج');location.hash=cur.section&&cur.section.id?'#/section/'+encodeURIComponent(cur.section.id):'#/';}catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحذف الآن');}
+}
+async function addToCart(){
+  var p=cur.product,pl=cur.place;if(!p||!pl)return;
+  if(cart&&cart.items.length&&cart.placeId!==pl.id){
+    if(!await confirmSheet('بدء طلب جديد','سلتك فيها منتجات من '+cart.placeName+'. الطلب الواحد يكون من محل واحد، فهل نبدأ طلبًا جديدًا؟','نعم، ابدأ طلبًا جديدًا',true))return;
+    cart=null;
+  }
+  if(!cart)cart={placeId:pl.id,placeName:pl.name,whatsapp:pl.whatsapp||'',prep:pl.prep_minutes,lat:pl.lat,lng:pl.lng,items:[]};
+  var it=null;cart.items.forEach(function(i){if(i.id===p.id)it=i;});
+  if(it)it.qty+=1;else cart.items.push({id:p.id,name:p.name,price:p.price==null?null:Number(p.price),qty:1});
+  saveCart();toast('أضفنا المنتج إلى طلبك');
+}
+function changeQty(id,d){
+  if(!cart)return;
+  cart.items.forEach(function(i){if(i.id===id)i.qty+=d;});
+  cart.items=cart.items.filter(function(i){return i.qty>0});
+  if(!cart.items.length)cart=null;
+  saveCart();render();
+}
+async function actLogout(){
+  try{if(session)await fetch(BASE+'/auth/v1/logout',{method:'POST',headers:authHeaders()});}catch(e){}
+  saveSession(null);S.isAdmin=false;S.shops=[];S.rideStaff=false;toast('تم تسجيل الخروج');render();
+}
+
+/* ===== التقاط النقرات ===== */
+document.addEventListener('click',function(e){
+  var sb=$('searchBox');
+  if(sb&&!e.target.closest('#searchBox')&&!e.target.closest('#sugg')&&$('sugg'))$('sugg').hidden=true;
+  var el=e.target.closest('[data-act]');if(!el)return;
+  var a=el.getAttribute('data-act'),id=el.getAttribute('data-id');
+  if(a==='cat'){S.catIdx=+el.getAttribute('data-i');renderCats();renderList();}
+  else if(a==='pick'){var p=placeById(id);if(!p)return;var i=S.cats.findIndex(function(c){return c.id===p.category_id});if(i>=0)S.catIdx=i;S.flash=id;$('q').value=p.name;$('clr').hidden=false;$('sugg').hidden=true;renderCats();renderList();}
+  else if(a==='askloc'){if(S.permState==='denied')location.reload();else askLocation();}
+  else if(a==='reload'){var r=route();if(r.name==='home')loadHome();else render();}
+  else if(a==='addplace')actAddPlace();
+  else if(a==='editplace')actEditPlace(id);
+  else if(a==='delplace')actDelPlace(id);
+  else if(a==='addsection')actAddSection(id,+el.getAttribute('data-n')||0);
+  else if(a==='delsection')actDelSection(id,el.getAttribute('data-place'));
+  else if(a==='addproduct')actAddProduct(id);
+  else if(a==='editproduct')actEditProduct();
+  else if(a==='delproduct')actDelProduct();
+  else if(a==='like')location.hash='#/similar/'+encodeURIComponent(id);
+  else if(a==='dislike'){toast('انظر إلى منتج آخر كل الأفضل هنا');location.hash='#/alternatives/'+encodeURIComponent(id);}
+  else if(a==='addfam')actAddFam();
+  else if(a==='additem')actAddItem();
+  else if(a==='renfam')actRenFam(id);
+  else if(a==='delfam')actDelFam(id);
+  else if(a==='reniem')actRenItem(id);
+  else if(a==='moveitem')actMoveItem(id);
+  else if(a==='delitem')actDelItem(id);
+  else if(a==='ans')actAnswer(id,el.getAttribute('data-v')==='1');
+  else if(a==='reorder')actReorder(id);
+  else if(a==='handled')actHandled(id);
+  else if(a==='receive')actReceive(id);
+  else if(a==='ridenum')actRideNum();
+  else if(a==='ridedriver')actRideDriver(id);
+  else if(a==='ridedone')actRideDone(id,el.getAttribute('data-v')==='1');
+  else if(a==='addridestaff')actAddRideStaff();
+  else if(a==='rmridestaff')actRmRideStaff(id);
+  else if(a==='addstaff')actAddStaff();
+  else if(a==='rmstaff')actRmStaff(el.getAttribute('data-id'),el.getAttribute('data-place'));
+  else if(a==='delpost')actDelPost(id);
+  else if(a==='signup')actSignup();
+  else if(a==='editprofile')actEditProfile();
+  else if(a==='login'||a==='ownerlogin'){loginSheet(a==='ownerlogin').then(function(ok){if(ok)checkAdmin().then(function(){toast('أهلًا بعودتك');render();});});}
+  else if(a==='logout')actLogout();
+  else if(a==='addcart')addToCart();
+  else if(a==='qty')changeQty(id,+el.getAttribute('data-d'));
+  else if(a==='clearcart'){confirmSheet('تفريغ السلة','هل تريد حذف كل منتجات طلبك الحالي؟','نعم، فرّغ السلة').then(function(ok){if(ok){cart=null;saveCart();render();}});}
+  else if(a==='clearorders'){confirmSheet('مسح السجل','هل تريد مسح سجل طلباتك السابقة من هذا الجهاز؟','نعم، امسح').then(function(ok){if(ok){orders=[];lsSet(OKEY,orders);render();}});}
+  else if(a==='sendorder'){var ch=el.getAttribute('data-ch')||'whatsapp';setTimeout(function(){finalizeOrder(ch);},400);}
+});
+document.addEventListener('click',function(e){if(e.target.closest('#clr')){var q=$('q');q.value='';renderSugg();q.focus();}});
+
+/* ===== البدء ===== */
+if(!location.hash)history.replaceState(null,'',location.pathname+location.search+'#/');
+checkAdmin().then(function(ad){if($('addPlace'))$('addPlace').hidden=!ad;if(ad&&S.perm==='granted'&&route().name!=='home')render();});
+if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
+updateBadge();
+setTimeout(checkFollowUp,3000);setInterval(checkFollowUp,300000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(checkFollowUp,800);});
+askLocation(); /* يُطلب إذن الموقع مباشرة عند فتح التطبيق */
+})();
+</script>
+</body>
+</html>
