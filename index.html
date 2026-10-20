@@ -427,7 +427,7 @@ var renderTok=0;
 
 async function checkAdmin(){
   if(!session){S.isAdmin=false;S.shops=[];S.rideStaff=false;return false;}
-  try{S.isAdmin=(await rpc('is_admin'))===true;}catch(e){S.isAdmin=false;}
+  try{var ra=await rpc('is_admin');S.isAdmin=ra===true;if(ra!==true)toast('فحص المالك: الرد = '+JSON.stringify(ra));}catch(e){S.isAdmin=false;toast('فحص المالك فشل: '+(e&&e.message?e.message:e));}
   try{var sh=await sel('shop_staff',{select:'place_id,places(name)',user_id:'eq.'+session.user.id});S.shops=(sh||[]).map(function(x){return{id:x.place_id,name:x.places?x.places.name:''};});}catch(e){S.shops=[];}
   try{var rs=await sel('ride_staff',{select:'user_id',user_id:'eq.'+session.user.id});S.rideStaff=!!(rs&&rs.length);}catch(e){S.rideStaff=false;}
   return S.isAdmin;
