@@ -1226,11 +1226,11 @@ function loginSheet(owner){
       e.preventDefault();var b=$('lgGo');b.disabled=true;b.textContent='جاري الدخول';
       try{
         var res=await fetch(BASE+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('f_em').value.trim(),password:$('f_pw').value})});
-        if(!res.ok)throw new Error('login');
+        if(!res.ok){var et=await res.text();throw new Error('سبب الرفض: '+et);}
         var j=await res.json();
         saveSession(sessFrom(j));
         closeSheet();pending=null;resolve(true);
-      }catch(er){closeSheet();pending=null;toast(owner?NOT_ALLOWED:'تعذّر الدخول، تأكد من البريد وكلمة المرور');resolve(false);}
+      }catch(er){closeSheet();pending=null;toast(owner?NOT_ALLOWED:(er&&er.message&&er.message.indexOf('سبب الرفض')===0?er.message:'تعذّر الدخول، تأكد من البريد وكلمة المرور'));resolve(false);}
     });
   });
 }
