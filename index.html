@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#1B7FAE">
+<script>try{var __t=localStorage.getItem("captain_theme");if(__t==="light"||__t==="dark"){document.documentElement.setAttribute("data-theme",__t);var __m=document.querySelector('meta[name="theme-color"]');if(__m)__m.setAttribute("content",__t==="dark"?"#0B1B23":"#1B7FAE");}}catch(e){}</script>
 <title>القبطان</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png" type="image/png">
@@ -40,6 +41,21 @@
     color-scheme:dark;
   }
 }
+:root[data-theme="dark"]{
+    --bg-outer:#06141A; --bg:#0B1B23; --surface:#122732; --surface-2:#173341; --line:#27414E;
+    --fg:#E6F3F8; --fg-2:#9DB8C4;
+    --primary:#58BFE3; --on-primary:#06222D; --primary-soft:#173B4A;
+    --band-1:#123241; --band-2:#0E2630;
+    --gold:#E0B04A; --gold-soft:#3A2F14; --gold-ink:#F0CF85;
+    --danger:#F0A090; --danger-soft:#3D1F1A;
+    --pat:rgba(88,191,227,.22); --shadow:0 6px 20px rgba(0,0,0,.35); --scrim:rgba(0,0,0,.6);
+    color-scheme:dark;
+}
+:root[data-theme="light"]{color-scheme:light}
+.brandbox{display:flex;align-items:center;gap:10px}
+.themebtn{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--surface);border:1.5px solid var(--gold);color:var(--gold);flex:none}
+.themebtn .ic{width:22px;height:22px;color:var(--gold)}
+.hdr .themebtn{position:relative;margin-inline-start:auto;margin-inline-end:12px}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg-outer);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.6;direction:rtl;text-align:right;-webkit-text-size-adjust:100%}
@@ -273,6 +289,7 @@ a{color:inherit;text-decoration:none}
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
     <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></symbol>
+    <symbol id="i-wheel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2"/><path d="M12 2v8M12 14v8M2 12h8M14 12h8M4.9 4.9l5.7 5.7M13.4 13.4l5.7 5.7M19.1 4.9l-5.7 5.7M10.6 13.4l-5.7 5.7"/></symbol>
     <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14c.9 1.4 2.2 2.2 3.5 2.2s2.6-.8 3.5-2.2M9 9.5v.5M15 9.5v.5"/></symbol>
     <symbol id="i-frown" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 16.5c.9-1.4 2.2-2.2 3.5-2.2s2.6.8 3.5 2.2M9 9.5v.5M15 9.5v.5"/></symbol>
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
@@ -335,6 +352,10 @@ function imgUrl(path){return path?BASE+'/storage/v1/object/public/'+BUCKET+'/'+p
 
 var toastT;
 function toast(m){var t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},3000);}
+/* الوضع الفاتح والداكن: افتراضيًا يتبع النظام، وبعد الضغط على المقود يُحفظ اختيارك */
+function curTheme(){var t=document.documentElement.getAttribute('data-theme');if(t==='dark'||t==='light')return t;return(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+function applyTheme(t){document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='dark'?'#0B1B23':'#1B7FAE');}
+function toggleTheme(){var t=curTheme()==='dark'?'light':'dark';applyTheme(t);try{localStorage.setItem('captain_theme',t);}catch(e){}toast(t==='dark'?'تم تفعيل الوضع الداكن':'تم تفعيل الوضع الفاتح');}
 
 /* ===== الاتصال بقاعدة البيانات (REST مباشر) ===== */
 var SKEY='captain_session';
@@ -542,7 +563,7 @@ function viewPerm(){
     S.permCode===1?(browserBlocked?'الإذن مغلق من إعدادات المتصفح. اضغط على أيقونة القفل بجوار عنوان الموقع، واختر السماح للموقع، ثم حدّث الصفحة.':'نحتاج موقعك لنعرض لك الأماكن الأقرب إليك ونقدّر وقت وصول طلبك.'):
     'تأكد من تشغيل خدمة الموقع في جهازك، ثم حاول مرة أخرى.';
   var btn=S.perm==='unsupported'?'':'<button class="btn p" data-act="askloc">'+(browserBlocked?'تحديث الصفحة':(S.permCode===1?'منح الإذن':'إعادة المحاولة'))+'</button>';
-  setView('<header class="band g locked">'+patSvg()+'<div class="search">'+icon('search')+'<input type="search" disabled placeholder="ابحث عن مطعم أو هايبر أو مقهى" aria-label="ابحث"></div><div class="meta-row"><div class="loc">'+icon('pinoff')+'<span>الموقع غير مفعّل</span></div><div class="brand">'+icon('compass')+'القبطان</div></div></header>'+
+  setView('<header class="band g locked">'+patSvg()+'<div class="search">'+icon('search')+'<input type="search" disabled placeholder="ابحث عن مطعم أو هايبر أو مقهى" aria-label="ابحث"></div><div class="meta-row"><div class="loc">'+icon('pinoff')+'<span>الموقع غير مفعّل</span></div><div class="brandbox"><button class="themebtn" type="button" data-act="theme" aria-label="تبديل الوضع الفاتح والداكن" title="الوضع الفاتح والداكن">'+icon('wheel')+'</button><div class="brand">'+icon('compass')+'القبطان</div></div></div></header>'+
     '<div class="g"><div class="deny">'+patSvg()+'<div class="big">'+icon('pinoff')+'</div><h2>'+title+'</h2><p>'+body+'</p>'+btn+'</div></div>',true);
 }
 
@@ -553,7 +574,7 @@ setInterval(function(){var n=$('note');if(n){mi=(mi+1)%MSG.length;n.textContent=
 function homeShell(){
   return '<header class="band g">'+patSvg()+
     '<div class="search" id="searchBox" role="search">'+icon('search')+'<input id="q" type="search" autocomplete="off" enterkeyhint="search" placeholder="ابحث عن مطعم أو هايبر أو مقهى" aria-label="ابحث عن مكان"><button class="clr" id="clr" type="button" aria-label="مسح البحث" hidden>'+icon('x')+'</button></div>'+
-    '<div class="meta-row"><div class="loc">'+icon('pin')+'<span>التوصيل إلى <b>موقعك الحالي</b></span></div><div class="brand">'+icon('compass')+'القبطان</div></div></header>'+
+    '<div class="meta-row"><div class="loc">'+icon('pin')+'<span>التوصيل إلى <b>موقعك الحالي</b></span></div><div class="brandbox"><button class="themebtn" type="button" data-act="theme" aria-label="تبديل الوضع الفاتح والداكن" title="الوضع الفاتح والداكن">'+icon('wheel')+'</button><div class="brand">'+icon('compass')+'القبطان</div></div></div></header>'+
     '<div class="sugg" id="sugg" hidden></div>'+
     '<div class="note g"><p id="note">'+esc(MSG[mi])+'</p></div>'+
     '<div class="g"><a class="ridecard" href="#/ride">'+icon('car')+'<div><b>هَل تحتاج أنْ تصلَ لمَكانٍ ؟</b><span>اٌطلُبْ قُبطانك الآن واٌطمئنِ فلن نختلف أبدًا</span></div></a></div>'+
@@ -1111,7 +1132,7 @@ async function actDelPost(id){
 async function viewAccount(){
   setView(loading(),true);
   if(session&&!S.isAdmin)await checkAdmin();
-  var h='<header class="hdr">'+patSvg()+'<div class="hdr-top"><h1 style="padding:8px 12px">حسابي</h1></div></header><div class="g">';
+  var h='<header class="hdr">'+patSvg()+'<div class="hdr-top"><h1 style="padding:8px 12px">حسابي</h1><button class="themebtn" type="button" data-act="theme" aria-label="تبديل الوضع الفاتح والداكن" title="الوضع الفاتح والداكن">'+icon('wheel')+'</button></div></header><div class="g">';
   if(session){
     var m=me();
     h+='<div class="acc"><h2>'+esc(m.name?('أهلًا بك يا '+m.name):'أهلًا بك في القبطان')+'</h2>'+
@@ -1491,6 +1512,7 @@ document.addEventListener('click',function(e){
   var a=el.getAttribute('data-act'),id=el.getAttribute('data-id');
   if(a==='cat'){S.catIdx=+el.getAttribute('data-i');renderCats();renderList();}
   else if(a==='pick'){var p=placeById(id);if(!p)return;var i=S.cats.findIndex(function(c){return c.id===p.category_id});if(i>=0)S.catIdx=i;S.flash=id;$('q').value=p.name;$('clr').hidden=false;$('sugg').hidden=true;renderCats();renderList();}
+  else if(a==='theme')toggleTheme();
   else if(a==='askloc'){if(S.permState==='denied')location.reload();else askLocation();}
   else if(a==='reload'){var r=route();if(r.name==='home')loadHome();else render();}
   else if(a==='addplace')actAddPlace();
