@@ -344,16 +344,27 @@ function sessFrom(j){var now=Math.floor(Date.now()/1000);return{access_token:j.a
 function me(){var u=session&&session.user,m=(u&&u.user_metadata)||{};return{email:(u&&u.email)||'',name:m.name||'',phone:m.phone||''};}
 function saveSession(s){session=s;try{if(s)localStorage.setItem(SKEY,JSON.stringify(s));else localStorage.removeItem(SKEY);}catch(e){}}
 function authHeaders(extra){var h={'apikey':KEY};if(session)h['Authorization']='Bearer '+session.access_token;if(extra)for(var k in extra)h[k]=extra[k];return h;}
+/* تجديد الجلسة: لا نمسحها إلا إذا رفضها السيرفر نفسه فعلًا، وأي انقطاع نت أو خطأ مؤقت لا يُخرج المستخدم */
+var refreshing=null;
+function nowSec(){return Math.floor(Date.now()/1000);}
+function readStored(){try{var r=JSON.parse(localStorage.getItem(SKEY)||'null');return r&&r.access_token?r:null;}catch(e){return null;}}
+async function doRefresh(){
+  var st=readStored();
+  if(st&&session&&st.refresh_token!==session.refresh_token){session=st;if(!st.expires_at||st.expires_at-nowSec()>120)return;}
+  var rt=session&&session.refresh_token;if(!rt)return;
+  try{
+    var r=await fetch(BASE+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:rt})});
+    if(r.ok){saveSession(sessFrom(await r.json()));return;}
+    var st2=readStored();
+    if(st2&&st2.refresh_token!==rt){session=st2;return;}
+    if(r.status===400||r.status===401||r.status===403){saveSession(null);S.isAdmin=false;}
+  }catch(e){}
+}
 async function refreshIfNeeded(){
   if(!session)return;
-  var now=Math.floor(Date.now()/1000);
-  if(session.expires_at&&session.expires_at-now>60)return;
-  try{
-    var r=await fetch(BASE+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({refresh_token:session.refresh_token})});
-    if(!r.ok)throw new Error('refresh');
-    var j=await r.json();
-    saveSession(sessFrom(j));
-  }catch(e){saveSession(null);S.isAdmin=false;}
+  if(session.expires_at&&session.expires_at-nowSec()>120)return;
+  if(!refreshing)refreshing=doRefresh().then(function(){refreshing=null;},function(){refreshing=null;});
+  await refreshing;
 }
 async function api(method,path,opts){
   opts=opts||{};
@@ -361,6 +372,7 @@ async function api(method,path,opts){
   var h=authHeaders(opts.headers),body;
   if(opts.json!==undefined){h['Content-Type']='application/json';body=JSON.stringify(opts.json);}
   var res=await fetch(BASE+path,{method:method,headers:h,body:body});
+  if(res.status===401&&session&&!opts._r){opts._r=1;session.expires_at=1;await refreshIfNeeded();return api(method,path,opts);}
   var text=await res.text(),data=null;
   try{data=text?JSON.parse(text):null;}catch(e){data=text;}
   if(!res.ok){var er=new Error((data&&(data.message||data.error_description||data.error))||('HTTP '+res.status));er.status=res.status;er.code=data&&data.code;throw er;}
@@ -1529,6 +1541,8 @@ if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventLis
 updateBadge();
 setTimeout(checkFollowUp,3000);setInterval(checkFollowUp,300000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(checkFollowUp,800);});
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&session)refreshIfNeeded();});
+window.addEventListener('storage',function(e){if(e.key===SKEY){session=readStored();if(!session){S.isAdmin=false;render();}}});
 askLocation(); /* يُطلب إذن الموقع مباشرة عند فتح التطبيق */
 })();
 </script>
