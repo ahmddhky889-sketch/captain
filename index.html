@@ -460,7 +460,7 @@ var renderTok=0;
 
 async function checkAdmin(){
   if(!session){S.isAdmin=false;S.shops=[];S.rideStaff=false;return false;}
-  try{var ra=await rpc('is_admin');S.isAdmin=ra===true;if(ra!==true)toast('فحص المالك: الرد = '+JSON.stringify(ra));}catch(e){S.isAdmin=false;toast('فحص المالك فشل: '+(e&&e.message?e.message:e));}
+  try{S.isAdmin=(await rpc('is_admin'))===true;}catch(e){S.isAdmin=false;}
   try{var sh=await sel('shop_staff',{select:'place_id,places(name)',user_id:'eq.'+session.user.id});S.shops=(sh||[]).map(function(x){return{id:x.place_id,name:x.places?x.places.name:''};});}catch(e){S.shops=[];}
   try{var rs=await sel('ride_staff',{select:'user_id',user_id:'eq.'+session.user.id});S.rideStaff=!!(rs&&rs.length);}catch(e){S.rideStaff=false;}
   return S.isAdmin;
@@ -972,19 +972,31 @@ async function actRideNum(){
 /* صندوق طلبات المشاوير: للمالك والمنسّق */
 var lastRidePending=null;
 async function ridesHtml(){
-  var hd=header('طلبات المشاوير','اتصل بالراكب أو راسله لتتفقا على السعر','#/account');
+  var hd=header('طلبات المشاوير','اقبل الطلب أولًا، ثم اتصل بالراكب لتتفقا على السعر','#/account');
   if(session&&!S.isAdmin&&!S.rideStaff)await checkAdmin();
   if(!session||!(S.isAdmin||S.rideStaff))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة للمالك ولمنسّقي المشاوير فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>',pending:0};
   var rows=await sel('rides',{select:'*',order:'created_at.desc',limit:'60'})||[];
-  var now=Date.now(),age=function(o){return now-new Date(o.created_at).getTime();};
+  var uid=session.user.id,now=Date.now(),age=function(o){return now-new Date(o.created_at).getTime();};
   var fresh=rows.filter(function(o){return !o.contacted&&age(o)<2*DAY;});
   var done=rows.filter(function(o){return fresh.indexOf(o)<0;}).slice(0,15);
+  function mins(o){return Math.max(1,Math.round(age(o)/60000));}
+  function base(o){return chip('clock',dateAr(o.created_at))+chip('tag',arNum(o.passengers)+(o.passengers===1?' راكب':' ركاب'),true);}
+  function acceptBtn(o,block){return '<button class="btn p'+(block?' block':'')+'" data-act="rideaccept" data-id="'+esc(o.id)+'">'+icon('car')+'اقبل الطلب</button>';}
   function card(o,isFresh){
+    var open=!o.accepted_by,mine=!!o.accepted_by&&o.accepted_by===uid;
+    /* طلب لم يقبله أحد: المنسّق يرى الوجهة وعدد الركاب فقط، وبيانات الراكب تظهر بعد القبول */
+    if(open&&!S.isAdmin){
+      if(!isFresh)return '<section class="acc"><h2>'+esc(o.destination)+'</h2><div class="chips">'+base(o)+chip('clock','انتهى دون قبول')+'</div></section>';
+      return '<section class="acc"><h2>'+esc(o.destination)+'</h2><div class="chips">'+base(o)+'</div>'+acceptBtn(o,true)+'</section>';
+    }
+    /* طلب مع منسّق آخر */
+    if(!open&&!mine&&!S.isAdmin)return '<section class="acc"><h2>'+esc(o.destination)+'</h2><div class="chips">'+base(o)+chip('user','الطلب مع '+(o.accepted_name||'منسّق آخر'),true)+'</div></section>';
     var wa=waPhone(o.customer_phone),map='https://maps.google.com/?q='+o.pickup_lat+','+o.pickup_lng;
     var msg='السلام عليكم يا '+(o.customer_name||'')+'، معك القبطان بخصوص مشوارك إلى '+o.destination+'.'+(o.driver_name?' سائقك: '+o.driver_name+(o.driver_car?'، والسيارة: '+o.driver_car:'')+'. نتفق على السعر قبل بدء المشوار.':' سنرسل لك اسم السائق ونوع السيارة ورقمها، ثم نتفق على السعر.');
-    return '<section class="acc"><h2>'+esc(o.destination)+'</h2><div class="chips">'+chip('user',o.customer_name||'راكب')+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+chip('clock',dateAr(o.created_at))+chip('tag',arNum(o.passengers)+(o.passengers===1?' راكب':' ركاب'),true)+(o.driver_name?chip('car','السائق: '+o.driver_name,true):'')+(o.driver_car?chip('car',o.driver_car):'')+'</div>'+
+    var who=open?chip('clock',(isFresh&&mins(o)>=5)?'معلّق منذ '+arNum(mins(o))+' دقيقة':'لم يقبله أحد بعد',true):chip('user',mine?'الطلب معك':'قبله: '+(o.accepted_name||'منسّق'),true);
+    return '<section class="acc"><h2>'+esc(o.destination)+'</h2><div class="chips">'+chip('user',o.customer_name||'راكب')+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+base(o)+who+(o.driver_name?chip('car','السائق: '+o.driver_name,true):'')+(o.driver_car?chip('car',o.driver_car):'')+'</div>'+
       (o.pickup_note?'<p>قرب مكانه: '+esc(o.pickup_note)+'</p>':'')+(o.note?'<p>'+esc(o.note)+'</p>':'')+
-      '<div class="adm" style="padding-top:0">'+(o.customer_phone?'<a class="btn p" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(msg)+'">'+icon('chat')+'واتساب</a>':'')+'<a class="btn s" target="_blank" rel="noopener" href="'+map+'">'+icon('pin')+'موقعه</a>'+
+      '<div class="adm" style="padding-top:0">'+(open&&isFresh?acceptBtn(o,false):'')+(o.customer_phone?'<a class="btn '+(open&&isFresh?'s':'p')+'" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(msg)+'">'+icon('chat')+'واتساب</a>':'')+'<a class="btn s" target="_blank" rel="noopener" href="'+map+'">'+icon('pin')+'موقعه</a>'+
       '<button class="btn s" data-act="ridedriver" data-id="'+esc(o.id)+'">'+icon('user')+(o.driver_name?'تعديل السائق':'تحديد السائق')+'</button>'+
       '<button class="btn s" data-act="ridedone" data-id="'+esc(o.id)+'" data-v="'+(isFresh?'1':'0')+'">'+(isFresh?'تم التواصل':'إعادته للجديدة')+'</button></div></section>';
   }
@@ -992,8 +1004,8 @@ async function ridesHtml(){
   if(!fresh.length)h+='<div class="empty" style="padding-top:0">لا توجد طلبات جديدة الآن.</div>';
   fresh.forEach(function(o){h+=card(o,true);});
   if(done.length){h+='<div class="sec-head"><h2>آخر الطلبات</h2></div>';done.forEach(function(o){h+=card(o,false);});}
-  h+='<p style="padding:14px 0 0;font-size:12px;color:var(--fg-2)">تتحدث هذه الشاشة كل نصف دقيقة وهي مفتوحة. علامة "تم التواصل" تظهر لفريقكم فقط، ولا يراها الراكب.</p></div>';
-  return{html:h,pending:fresh.length};
+  h+='<p style="padding:14px 0 0;font-size:12px;color:var(--fg-2)">تتحدث هذه الشاشة كل ١٠ ثوانٍ وهي مفتوحة. أول منسّق يضغط "اقبل الطلب" يأخذ الطلب، وعلامة "تم التواصل" تظهر لفريقكم فقط، ولا يراها الراكب.</p></div>';
+  return{html:h,pending:fresh.filter(function(o){return !o.accepted_by;}).length};
 }
 async function viewRides(){var r=await ridesHtml();lastRidePending=r.pending;return r;}
 async function refreshRides(){
@@ -1002,7 +1014,7 @@ async function refreshRides(){
     if(lastRidePending!==null&&r.pending>lastRidePending){toast('وصل طلب مشوار جديد');try{navigator.vibrate&&navigator.vibrate(200);}catch(e){}}
     lastRidePending=r.pending;$('view').innerHTML=r.html;}catch(e){}
 }
-setInterval(refreshRides,30000);
+setInterval(refreshRides,10000);
 var ridesCache={};
 async function actRideDriver(id){
   var o=null;try{o=(await sel('rides',{select:'id,driver_name,driver_car',id:'eq.'+id}))[0];}catch(e){}
@@ -1018,6 +1030,44 @@ async function actRideDone(id,v){
   catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى');}
   render();
 }
+
+/* رسالة التوفر: تصل لكل المنسّقين، وأول من يضغط "اقبل الطلب" يأخذه، والباقي يرى اسم من سبقهم */
+function rideBeep(){
+  try{var C=window.AudioContext||window.webkitAudioContext;if(C){var c=new C(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();setTimeout(function(){try{o.stop();c.close();}catch(e){}},350);}}catch(e){}
+  try{navigator.vibrate&&navigator.vibrate([200,100,200]);}catch(e){}
+}
+function closeRidePrompt(){var sc=$('scrim');if(sc&&sc.getAttribute('data-ride')){closeSheet();pending=null;}}
+async function actRideAccept(id){
+  try{
+    var r=await rpc('ride_accept',{p_id:id});
+    if(r==='ok')toast('الطلب لك الآن، تواصل مع الراكب');
+    else if(typeof r==='string'&&r.indexOf('taken:')===0)toast('عذرًا، الطلب مع '+(r.slice(6)||'منسّق آخر'));
+    else toast('هذا الطلب لم يعد موجودًا');
+    closeRidePrompt();
+    if(route().name==='rides')render();else if(r==='ok')location.hash='#/rides';
+  }catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر قبول الطلب الآن، جرّب مرة أخرى');}
+}
+function showRidePrompt(o){
+  var m=me();
+  rideBeep();
+  var w=openSheet('<h2>هل أنت يا '+esc(m.name||'منسّق')+' متوفّر حاليًا؟</h2><p>طلب مشوار إلى <b>'+esc(o.destination)+'</b>، '+arNum(o.passengers)+(o.passengers===1?' راكب':' ركاب')+'.</p><div class="acts"><button class="btn p block" id="rpAcc">اقبل الطلب</button><button class="btn s block" id="rpBusy">مشغول الآن، شوف غيري</button></div>',true,null);
+  w.setAttribute('data-ride','1');
+  $('rpAcc').addEventListener('click',function(){actRideAccept(o.id);});
+  $('rpBusy').addEventListener('click',function(){closeSheet();pending=null;toast('حاول تعجّل عشان محدش يسبقك');});
+}
+async function pollRidePrompt(){
+  if(!session||!S.rideStaff||document.hidden||$('scrim'))return;
+  try{
+    var rows=await sel('rides',{select:'id,destination,passengers,created_at',accepted_by:'is.null',contacted:'eq.false',order:'created_at.asc',limit:'10'})||[];
+    var seen=lsGet('captain_ride_seen',[]),now=Date.now();
+    if(!Array.isArray(seen))seen=[];
+    var o=rows.find(function(x){return seen.indexOf(x.id)<0&&now-new Date(x.created_at).getTime()<30*60000;});
+    if(!o||$('scrim'))return;
+    seen.push(o.id);lsSet('captain_ride_seen',seen.slice(-40));
+    showRidePrompt(o);
+  }catch(e){}
+}
+setInterval(pollRidePrompt,10000);
 
 /* منسّقو المشاوير (للمالك فقط) */
 async function viewRideStaff(){
@@ -1259,11 +1309,11 @@ function loginSheet(owner){
       e.preventDefault();var b=$('lgGo');b.disabled=true;b.textContent='جاري الدخول';
       try{
         var res=await fetch(BASE+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('f_em').value.trim(),password:$('f_pw').value})});
-        if(!res.ok){var et=await res.text();throw new Error('سبب الرفض: '+et);}
+        if(!res.ok){var et='';try{et=await res.text();}catch(x){}throw new Error('E:'+et);}
         var j=await res.json();
         saveSession(sessFrom(j));
         closeSheet();pending=null;resolve(true);
-      }catch(er){closeSheet();pending=null;toast(owner?NOT_ALLOWED:(er&&er.message&&er.message.indexOf('سبب الرفض')===0?er.message:'تعذّر الدخول، تأكد من البريد وكلمة المرور'));resolve(false);}
+      }catch(er){closeSheet();pending=null;toast(owner?NOT_ALLOWED:(/email_not_confirmed/i.test((er&&er.message)||'')?'فعّل بريدك أولًا من الرسالة التي وصلتك':'تعذّر الدخول، تأكد من البريد وكلمة المرور'));resolve(false);}
     });
   });
 }
@@ -1537,6 +1587,7 @@ document.addEventListener('click',function(e){
   else if(a==='handled')actHandled(id);
   else if(a==='receive')actReceive(id);
   else if(a==='ridenum')actRideNum();
+  else if(a==='rideaccept')actRideAccept(id);
   else if(a==='ridedriver')actRideDriver(id);
   else if(a==='ridedone')actRideDone(id,el.getAttribute('data-v')==='1');
   else if(a==='addridestaff')actAddRideStaff();
@@ -1563,6 +1614,7 @@ if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventLis
 updateBadge();
 setTimeout(checkFollowUp,3000);setInterval(checkFollowUp,300000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(checkFollowUp,800);});
+if(session)checkAdmin().then(function(){if(S.rideStaff)pollRidePrompt();}).catch(function(){});
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&session)refreshIfNeeded();});
 window.addEventListener('storage',function(e){if(e.key===SKEY){session=readStored();if(!session){S.isAdmin=false;render();}}});
 askLocation(); /* يُطلب إذن الموقع مباشرة عند فتح التطبيق */
