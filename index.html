@@ -248,6 +248,12 @@ a{color:inherit;text-decoration:none}
 .imgbox .ph{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--fg-2)}
 .imgbox .ph .ic{width:36px;height:36px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn.sm{min-height:38px;padding:0 14px;font-size:14px}
+.acrow{padding:8px 0;border-top:1px solid var(--line)}
+.acrow .pbody{flex:1}
+.or{display:flex;align-items:center;gap:10px;color:var(--fg-2);font-size:13px}
+.or:before,.or:after{content:'';flex:1;height:1px;background:var(--line)}
+.gl{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--primary);font-weight:800;font-size:14px;font-family:Arial,sans-serif}
 .av{display:inline-grid;place-items:center;width:52px;height:52px;border-radius:50%;background:var(--gold-soft);color:var(--gold-ink);font-weight:800;font-size:22px;overflow:hidden;flex:none;border:1.5px solid var(--gold)}
 .av.big{width:84px;height:84px;font-size:34px}
 .av img{width:100%;height:100%;object-fit:cover}
@@ -370,8 +376,28 @@ var SKEY='captain_session';
 var session=null;
 try{var raw=JSON.parse(localStorage.getItem(SKEY)||'null');if(raw&&raw.access_token)session=raw;}catch(e){}
 function sessFrom(j){var now=Math.floor(Date.now()/1000);return{access_token:j.access_token,refresh_token:j.refresh_token,expires_at:j.expires_at||(now+(j.expires_in||3600)),user:j.user||(session&&session.user)||null};}
-function me(){var u=session&&session.user,m=(u&&u.user_metadata)||{};return{email:(u&&u.email)||'',name:m.name||'',phone:m.phone||''};}
-function saveSession(s){session=s;try{if(s)localStorage.setItem(SKEY,JSON.stringify(s));else localStorage.removeItem(SKEY);}catch(e){}}
+function me(){var u=session&&session.user,m=(u&&u.user_metadata)||{};return{email:(u&&u.email)||'',name:m.name||m.full_name||'',phone:m.phone||''};}
+/* ينظّف البريد: يحذف أي مسافات (حتى داخله) ويحوّله لحروف صغيرة */
+function cleanEmail(v){return String(v||'').replace(/\s+/g,'').toLowerCase();}
+/* حسابات متعددة على نفس الجهاز: كل جلسة تُحفظ في قائمة، والجلسة الحالية في SKEY */
+var AKEY='captain_accounts';
+function readAccounts(){try{var l=JSON.parse(localStorage.getItem(AKEY)||'[]');return Array.isArray(l)?l.filter(function(x){return x&&x.access_token&&x.user&&x.user.id;}):[];}catch(e){return [];}}
+function writeAccounts(l){try{localStorage.setItem(AKEY,JSON.stringify(l.slice(0,8)));}catch(e){}}
+function upsertAccount(s){
+  if(!s||!s.user||!s.user.id)return;
+  var l=readAccounts(),i=l.findIndex(function(x){return x.user.id===s.user.id;});
+  if(i>=0)l[i]=s;else l.push(s);
+  writeAccounts(l);
+}
+function saveSession(s){
+  var prev=session;session=s;
+  try{if(s)localStorage.setItem(SKEY,JSON.stringify(s));else localStorage.removeItem(SKEY);}catch(e){}
+  try{
+    if(s)upsertAccount(s);
+    else if(prev&&prev.user&&prev.user.id)writeAccounts(readAccounts().filter(function(x){return x.user.id!==prev.user.id;}));
+  }catch(e){}
+}
+function resetRoleState(){S.isAdmin=false;S.shops=[];S.rideStaff=false;S.coord=null;}
 function authHeaders(extra){var h={'apikey':KEY};if(session)h['Authorization']='Bearer '+session.access_token;if(extra)for(var k in extra)h[k]=extra[k];return h;}
 /* تجديد الجلسة: لا نمسحها إلا إذا رفضها السيرفر نفسه فعلًا، وأي انقطاع نت أو خطأ مؤقت لا يُخرج المستخدم */
 var refreshing=null;
@@ -945,6 +971,7 @@ async function viewRide(){
       fieldHtml({id:'pnote',label:'علامة مميزة قرب مكانك (اختياري)',type:'text',hint:'مثل: أمام الصيدلية'})+
       fieldHtml({id:'pax',label:'عدد الركاب',type:'select',value:'1',options:[1,2,3,4,5,6].map(function(n){return{value:String(n),label:arNum(n)}})})+
       fieldHtml({id:'rnote',label:'ملاحظات (اختياري)',type:'textarea',hint:'مثل: معي حقائب، أو أريد الوصول قبل الساعة ٦'})+
+      (me().phone?'':fieldHtml({id:'rphone',label:'رقم موبايلك ليتواصل معك المنسّق',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000'}))+
       '<button class="btn p block" type="submit" id="rgo">'+icon('car')+'اطلب المشوار</button>'+
       '<p style="font-size:13px">يتواصل معك فريقنا على رقمك لنتفق على السعر وموعد وصول السيارة.</p></form>';
   }
@@ -966,7 +993,15 @@ function bindRide(){
     var dest=$('f_dest').value.trim();
     if(dest.length<2){toast('اكتب وجهتك أولًا');return;}
     if(!S.loc){toast('يجب منح إذن الموقع');return;}
-    var m=me(),b=$('rgo');b.disabled=true;
+    var m=me(),b=$('rgo');
+    if(!m.phone){
+      var ph=$('f_rphone')?$('f_rphone').value:'';
+      if(!validPhone(ph)){toast('اكتب رقم موبايلك ليتواصل معك المنسّق');return;}
+      b.disabled=true;
+      try{var uu=await api('PUT','/auth/v1/user',{json:{data:{name:m.name,phone:westernDigits(ph).replace(/\s/g,'')}}});saveSession(Object.assign({},session,{user:uu}));m=me();}
+      catch(x){b.disabled=false;toast('تعذّر حفظ رقمك الآن، جرّب مرة أخرى');return;}
+    }
+    b.disabled=true;
     try{
       await ins('rides',{customer_name:m.name||null,customer_phone:m.phone||null,pickup_lat:S.loc.lat,pickup_lng:S.loc.lng,pickup_note:$('f_pnote').value.trim()||null,destination:dest,passengers:+$('f_pax').value||1,note:$('f_rnote').value.trim()||null});
       var rc=await rideContact(),wa=waPhone(rc.wa);
@@ -1268,42 +1303,127 @@ async function viewAccount(){
       '<p>نضيف اسمك ورقمك تلقائيًا إلى رسالة الطلب حتى يتواصل معك المحل بسهولة.</p>'+
       '<button class="btn s block" data-act="editprofile">'+icon('edit')+'تعديل بياناتي</button>'+
       '<button class="btn d block" data-act="logout">تسجيل الخروج</button></div>';
+    h+=accountsHtml(false);
     if(S.isAdmin)h+='<div class="acc"><h2>أنت مسجّل كمالك</h2><p>يمكنك إضافة المحلات والأقسام والمنتجات وتعديلها من شاشاتها مباشرة.</p><a class="btn s block" href="#/taxonomy">'+icon('tag')+'إدارة الأصناف والفئات</a><a class="btn s block" href="#/complaints">'+icon('bag')+'طلبات تحتاج متابعة</a><a class="btn s block" href="#/staff">'+icon('user')+'حسابات المحلات</a><a class="btn s block" href="#/rides">'+icon('car')+'طلبات المشاوير</a><a class="btn s block" href="#/ridestaff">'+icon('user')+'المنسّقون</a></div>';
     if(S.coord)h+='<div class="acc"><h2>أنت منسّق</h2><div class="chips">'+chip('car','شغلك: '+(KINDS[S.coord.kind]||S.coord.kind),true)+chip('clock','حالتك: '+(STATUSES[S.coord.status]||''))+'</div><a class="btn s block" href="#/myprofile">'+icon('user')+'ملفي كمنسّق</a>'+(S.rideStaff?'<p>تصلك هنا طلبات المشاوير، وتتواصل مع الراكب لتتفقا على السعر.</p><a class="btn p block" href="#/rides">'+icon('car')+'طلبات المشاوير</a>':'')+'</div>';
     if(S.shops.length)h+='<div class="acc"><h2>حساب محل</h2><div class="chips">'+S.shops.map(function(x){return chip('tag',x.name,true)}).join('')+'</div><p>تصلك هنا طلبات محلك، وتؤكد استلامها بضغطة واحدة.</p><a class="btn p block" href="#/shoporders">'+icon('bag')+'الطلبات الواردة</a></div>';
+    h+='<form class="acc" id="naf" novalidate><h2>إنشاء حساب جديد</h2><p>حسابك الحالي يبقى محفوظًا على هذا الجهاز، وتقدر تبدّل بينهم في أي وقت.</p>'+
+      fieldHtml({id:'nname',label:'الاسم',type:'text'})+fieldHtml({id:'nphone',label:'رقم الموبايل (اختياري)',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000'})+fieldHtml({id:'nem',label:'البريد الإلكتروني',type:'email',ltr:true})+fieldHtml({id:'npw',label:'كلمة المرور (٦ أحرف على الأقل)',type:'password',ltr:true})+
+      '<button class="btn p block" type="submit" id="naGo">'+icon('plus')+'إنشاء حساب جديد</button></form>';
   }else{
-    h+='<div class="acc"><h2>أهلًا بك في القبطان</h2><p>أنشئ حسابك لتحفظ اسمك ورقمك، فيصل طلبك إلى المحل أسرع وأسهل.</p>'+
-      '<button class="btn p block" data-act="signup">إنشاء حساب</button>'+
-      '<button class="btn s block" data-act="login">تسجيل الدخول</button></div>';
+    h+=accountsHtml(true);
+    h+='<form class="acc" id="sgf" novalidate><h2>أهلًا بك في القبطان، سعدنا بانضمامك إلينا</h2><p>أنشئ حسابك في ثوانٍ، ثم ادخل مباشرة.</p>'+
+      fieldHtml({id:'gname',label:'الاسم',type:'text'})+fieldHtml({id:'gem',label:'البريد الإلكتروني',type:'email',ltr:true})+fieldHtml({id:'gpw',label:'كلمة المرور (٦ أحرف على الأقل)',type:'password',ltr:true})+
+      '<button class="btn p block" type="submit" id="sgGo">إنشاء الحساب</button>'+
+      '<div class="or"><span>أو</span></div>'+
+      '<button class="btn s block" type="button" data-act="google"><span class="gl" aria-hidden="true">G</span>المتابعة بحساب جوجل</button>'+
+      '<button class="btn s block" type="button" data-act="login">لدي حساب، تسجيل الدخول</button></form>';
   }
   setView(h+'</div>',true);
   setActiveTab('account');
+  var na=$('naf');
+  if(na)na.addEventListener('submit',async function(e){
+    e.preventDefault();
+    var nm=$('f_nname').value,ph=$('f_nphone').value,em=$('f_nem').value,pw=$('f_npw').value,er=signupCheck(nm,em,pw);
+    if(!er&&ph.trim()&&!validPhone(ph))er='اكتب رقم موبايل صحيحًا';
+    if(er){toast(er);return;}
+    var b=$('naGo');b.disabled=true;b.textContent='جاري إنشاء الحساب';
+    try{
+      var r=await signupRequest(nm,em,pw,ph);
+      if(r==='in'){resetRoleState();await checkAdmin();toast('أنشأنا الحساب وانتقلت إليه، وحسابك السابق محفوظ');render();}
+      else{b.disabled=false;b.innerHTML=icon('plus')+'إنشاء حساب جديد';toast('أرسلنا رسالة تأكيد إلى بريده. حسابك الحالي ما زال مفتوحًا');}
+    }catch(x){b.disabled=false;b.innerHTML=icon('plus')+'إنشاء حساب جديد';toast(signupError(x));}
+  });
+  var sg=$('sgf');
+  if(sg)sg.addEventListener('submit',async function(e){
+    e.preventDefault();
+    var nm=$('f_gname').value,em=$('f_gem').value,pw=$('f_gpw').value,er=signupCheck(nm,em,pw);
+    if(er){toast(er);return;}
+    var b=$('sgGo');b.disabled=true;b.textContent='جاري إنشاء حسابك';
+    try{afterSignup(await signupRequest(nm,em,pw));}
+    catch(x){b.disabled=false;b.textContent='إنشاء الحساب';toast(signupError(x));}
+  });
 }
 function validPhone(v){var d=westernDigits(v).replace(/[^0-9]/g,'');return d.length>=10&&d.length<=15;}
-async function actSignup(){
-  var result=null;
-  var ok=await formSheet({title:'إنشاء حساب',text:'نحتاج اسمك ورقمك ليتواصل معك المحل عند الطلب.',submit:'إنشاء الحساب',
-    errText:function(er){return er.status===429?'حاول بعد قليل من فضلك':er.status===422?'هذا البريد مسجّل من قبل، جرّب تسجيل الدخول':'تعذّر إنشاء الحساب الآن، جرّب مرة أخرى';},
-    fields:[{id:'name',label:'الاسم',type:'text'},{id:'phone',label:'رقم الموبايل',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000'},{id:'em',label:'البريد الإلكتروني',type:'email',ltr:true},{id:'pw',label:'كلمة المرور (٦ أحرف على الأقل)',type:'password',ltr:true}],
-    validate:function(v){if(!v.name.trim())return 'اكتب اسمك أولًا';if(!validPhone(v.phone))return 'اكتب رقم موبايل صحيحًا';if(!/^\S+@\S+\.\S+$/.test(v.em.trim()))return 'اكتب بريدًا إلكترونيًا صحيحًا';if(v.pw.length<6)return 'كلمة المرور قصيرة، اكتب ٦ أحرف على الأقل';return '';},
-    onSubmit:async function(v){
-      var j=await api('POST','/auth/v1/signup',{json:{email:v.em.trim(),password:v.pw,data:{name:v.name.trim(),phone:westernDigits(v.phone).replace(/\s/g,'')}}});
-      result=j&&j.access_token?'in':'confirm';
-      if(result==='in')saveSession(sessFrom(j));
-    }});
-  if(!ok)return;
-  if(result==='in'){toast('أهلًا بك في القبطان');await checkAdmin();}
+/* إنشاء حساب: الاسم والبريد وكلمة المرور فقط. يرجع 'in' لو دخل مباشرة، أو 'confirm' لو يحتاج تأكيد البريد */
+async function signupRequest(name,email,pw,phone){
+  var data={name:name.trim()};if(phone&&phone.trim())data.phone=westernDigits(phone).replace(/\s/g,'');
+  var j=await api('POST','/auth/v1/signup',{json:{email:cleanEmail(email),password:pw,data:data}});
+  var r=j&&j.access_token?'in':'confirm';
+  if(r==='in')saveSession(sessFrom(j));
+  return r;
+}
+function signupError(er){return er.status===429?'حاول بعد قليل من فضلك':(er.status===422||/already|registered/i.test(er.message||''))?'هذا البريد مسجّل من قبل، جرّب تسجيل الدخول':'تعذّر إنشاء الحساب الآن، جرّب مرة أخرى';}
+function signupCheck(name,email,pw){
+  if(!name.trim())return 'اكتب اسمك أولًا';
+  if(!/^\S+@\S+\.\S+$/.test(cleanEmail(email)))return 'اكتب بريدًا إلكترونيًا صحيحًا';
+  if(pw.length<6)return 'كلمة المرور قصيرة، اكتب ٦ أحرف على الأقل';
+  return '';
+}
+async function afterSignup(r){
+  if(r==='in'){resetRoleState();toast('أهلًا بك في القبطان');await checkAdmin();}
   else toast('أرسلنا رسالة تأكيد إلى بريدك، افتحها ثم سجّل دخولك');
   render();
+}
+async function actSignup(){
+  var result=null;
+  var ok=await formSheet({title:'إنشاء حساب',text:'ثلاث خانات فقط، ثم تدخل مباشرة.',submit:'إنشاء الحساب',
+    errText:signupError,
+    fields:[{id:'name',label:'الاسم',type:'text'},{id:'em',label:'البريد الإلكتروني',type:'email',ltr:true},{id:'pw',label:'كلمة المرور (٦ أحرف على الأقل)',type:'password',ltr:true}],
+    validate:function(v){return signupCheck(v.name,v.em,v.pw);},
+    onSubmit:async function(v){result=await signupRequest(v.name,v.em,v.pw);}});
+  if(ok)afterSignup(result);
+}
+/* تبديل الحسابات على نفس الجهاز */
+function accountsHtml(guest){
+  var l=readAccounts(),cur=session&&session.user?session.user.id:null;
+  if(guest?l.length<1:l.length<2)return '';
+  var h='<section class="acc"><h2>حساباتي على هذا الجهاز</h2><p>'+(guest?'اضغط على حساب للدخول إليه مباشرة.':'بدّل بين حساباتك في أي وقت.')+'</p>';
+  l.forEach(function(a){
+    var md=a.user.user_metadata||{},nm=md.name||md.full_name||'',isCur=a.user.id===cur;
+    h+='<div class="prof acrow">'+avatarHtml(null,nm||a.user.email)+'<div class="pbody"><b>'+esc(nm||'بدون اسم')+'</b><span class="sc" dir="ltr" style="text-align:right">'+esc(a.user.email||'')+'</span></div>'+
+      (isCur?'<span class="chip t">الحالي</span>':'<button class="btn p sm" data-act="switchacc" data-id="'+esc(a.user.id)+'">تبديل</button><button class="btn s sm" data-act="forgetacc" data-id="'+esc(a.user.id)+'" aria-label="إزالة من الجهاز">'+icon('x')+'</button>')+'</div>';
+  });
+  return h+'</section>';
+}
+async function switchAccount(id){
+  if(session&&session.user&&session.user.id===id)return;
+  var t=readAccounts().find(function(x){return x.user.id===id;});if(!t)return;
+  saveSession(t);resetRoleState();
+  try{await refreshIfNeeded();}catch(e){}
+  if(!session){toast('انتهت جلسة هذا الحساب، سجّل دخولك مرة أخرى');render();return;}
+  await checkAdmin();
+  var m=me();toast('أنت الآن في حساب '+(m.name||m.email));
+  render();
+}
+async function forgetAccount(id){
+  if(!await confirmSheet('إزالة الحساب من الجهاز','سنزيله من قائمة حساباتك هنا فقط، ولن يُحذف الحساب نفسه.','نعم، أزِله'))return;
+  writeAccounts(readAccounts().filter(function(x){return x.user.id!==id;}));
+  toast('تمت الإزالة');render();
+}
+/* المتابعة بجوجل: يحوّلك Supabase إلى جوجل ثم يعيدك إلى التطبيق ومعك الجلسة في الرابط */
+function startGoogle(){location.href=BASE+'/auth/v1/authorize?provider=google&redirect_to='+encodeURIComponent(location.origin+location.pathname);}
+function b64json(t){try{t=t.replace(/-/g,'+').replace(/_/g,'/');while(t.length%4)t+='=';return JSON.parse(decodeURIComponent(escape(atob(t))));}catch(e){return null;}}
+function handleOAuthReturn(){
+  var h=location.hash||'';
+  if(h.indexOf('access_token=')<0&&h.indexOf('error_description=')<0)return;
+  var q={};h.replace(/^#\/?/,'').split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)try{q[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1).replace(/\+/g,' '));}catch(e){}});
+  history.replaceState(null,'',location.pathname+location.search+'#/account');
+  if(!q.access_token){setTimeout(function(){toast('تعذّر الدخول بجوجل، جرّب مرة أخرى');},600);return;}
+  var c=b64json((q.access_token.split('.')[1])||'')||{};
+  if(!c.sub){setTimeout(function(){toast('تعذّر الدخول بجوجل، جرّب مرة أخرى');},600);return;}
+  var now=Math.floor(Date.now()/1000);
+  saveSession({access_token:q.access_token,refresh_token:q.refresh_token||'',expires_at:now+(+q.expires_in||3600),user:{id:c.sub,email:c.email||'',user_metadata:c.user_metadata||{}}});
+  setTimeout(function(){toast('أهلًا بك في القبطان');},600);
 }
 async function actEditProfile(){
   var m=me();
   var ok=await formSheet({title:'تعديل بياناتي',submit:'حفظ التعديل',
     errText:function(){return 'تعذّر الحفظ الآن، جرّب مرة أخرى';},
-    fields:[{id:'name',label:'الاسم',type:'text',value:m.name},{id:'phone',label:'رقم الموبايل',type:'text',inputmode:'tel',ltr:true,value:m.phone}],
-    validate:function(v){if(!v.name.trim())return 'اكتب اسمك أولًا';if(!validPhone(v.phone))return 'اكتب رقم موبايل صحيحًا';return '';},
+    fields:[{id:'name',label:'الاسم',type:'text',value:m.name},{id:'phone',label:'رقم الموبايل (اختياري، يلزم فقط عند طلب مشوار)',type:'text',inputmode:'tel',ltr:true,value:m.phone}],
+    validate:function(v){if(!v.name.trim())return 'اكتب اسمك أولًا';if(v.phone.trim()&&!validPhone(v.phone))return 'اكتب رقم موبايل صحيحًا';return '';},
     onSubmit:async function(v){
-      var u=await api('PUT','/auth/v1/user',{json:{data:{name:v.name.trim(),phone:westernDigits(v.phone).replace(/\s/g,'')}}});
+      var u=await api('PUT','/auth/v1/user',{json:{data:{name:v.name.trim(),phone:v.phone.trim()?westernDigits(v.phone).replace(/\s/g,''):''}}});
       saveSession(Object.assign({},session,{user:u}));
     }});
   if(ok){toast('تم حفظ بياناتك');render();}
@@ -1387,7 +1507,7 @@ function loginSheet(owner){
     $('lf').addEventListener('submit',async function(e){
       e.preventDefault();var b=$('lgGo');b.disabled=true;b.textContent='جاري الدخول';
       try{
-        var res=await fetch(BASE+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({email:$('f_em').value.trim(),password:$('f_pw').value})});
+        var res=await fetch(BASE+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'apikey':KEY,'Content-Type':'application/json'},body:JSON.stringify({email:cleanEmail($('f_em').value),password:$('f_pw').value})});
         if(!res.ok){var et='';try{et=await res.text();}catch(x){}throw new Error('E:'+et);}
         var j=await res.json();
         saveSession(sessFrom(j));
@@ -1679,6 +1799,9 @@ document.addEventListener('click',function(e){
   else if(a==='rmstaff')actRmStaff(el.getAttribute('data-id'),el.getAttribute('data-place'));
   else if(a==='delpost')actDelPost(id);
   else if(a==='signup')actSignup();
+  else if(a==='google')startGoogle();
+  else if(a==='switchacc')switchAccount(id);
+  else if(a==='forgetacc')forgetAccount(id);
   else if(a==='editprofile')actEditProfile();
   else if(a==='login'||a==='ownerlogin'){loginSheet(a==='ownerlogin').then(function(ok){if(ok)checkAdmin().then(function(){toast('أهلًا بعودتك');render();});});}
   else if(a==='logout')actLogout();
@@ -1691,6 +1814,8 @@ document.addEventListener('click',function(e){
 document.addEventListener('click',function(e){if(e.target.closest('#clr')){var q=$('q');q.value='';renderSugg();q.focus();}});
 
 /* ===== البدء ===== */
+handleOAuthReturn();
+try{if(session)upsertAccount(session);}catch(e){}
 if(!location.hash)history.replaceState(null,'',location.pathname+location.search+'#/');
 checkAdmin().then(function(ad){if($('addPlace'))$('addPlace').hidden=!ad;if(ad&&S.perm==='granted'&&route().name!=='home')render();});
 if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
