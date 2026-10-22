@@ -248,6 +248,14 @@ a{color:inherit;text-decoration:none}
 .imgbox .ph{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--fg-2)}
 .imgbox .ph .ic{width:36px;height:36px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.av{display:inline-grid;place-items:center;width:52px;height:52px;border-radius:50%;background:var(--gold-soft);color:var(--gold-ink);font-weight:800;font-size:22px;overflow:hidden;flex:none;border:1.5px solid var(--gold)}
+.av.big{width:84px;height:84px;font-size:34px}
+.av img{width:100%;height:100%;object-fit:cover}
+.prof{display:flex;align-items:center;gap:14px}
+.pbody{display:flex;flex-direction:column;gap:2px;min-width:0}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.row3 .btn{padding:0 6px;font-size:14px}
+
 .sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .acc{margin-top:20px;padding:20px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;gap:12px}
 .acc h2{margin:0;font-size:20px}
@@ -455,14 +463,20 @@ async function finalizeOrder(ch){
 }
 
 /* ===== الحالة ===== */
-var S={rideStaff:false,perm:'asking',permCode:0,permState:'',loc:null,cats:[],places:[],catIdx:0,isAdmin:false,shops:[],flash:null,loaded:false,failed:false};
+var S={rideStaff:false,coord:null,perm:'asking',permCode:0,permState:'',loc:null,cats:[],places:[],catIdx:0,isAdmin:false,shops:[],flash:null,loaded:false,failed:false};
 var renderTok=0;
 
 async function checkAdmin(){
-  if(!session){S.isAdmin=false;S.shops=[];S.rideStaff=false;return false;}
+  if(!session){S.isAdmin=false;S.shops=[];S.rideStaff=false;S.coord=null;return false;}
   try{S.isAdmin=(await rpc('is_admin'))===true;}catch(e){S.isAdmin=false;}
   try{var sh=await sel('shop_staff',{select:'place_id,places(name)',user_id:'eq.'+session.user.id});S.shops=(sh||[]).map(function(x){return{id:x.place_id,name:x.places?x.places.name:''};});}catch(e){S.shops=[];}
-  try{var rs=await sel('ride_staff',{select:'user_id',user_id:'eq.'+session.user.id});S.rideStaff=!!(rs&&rs.length);}catch(e){S.rideStaff=false;}
+  try{
+    var rs;
+    try{rs=await sel('ride_staff',{select:'user_id,kind,status',user_id:'eq.'+session.user.id});}
+    catch(e1){ /* قاعدة البيانات لم تُحدَّث بعد (ملف المرحلة ١): نعتبر المنسّق القديم منسّق مشاوير */
+      rs=(await sel('ride_staff',{select:'user_id',user_id:'eq.'+session.user.id})||[]).map(function(x){return{user_id:x.user_id,kind:'rides',status:'available'};});}
+    S.coord=rs&&rs[0]?rs[0]:null;S.rideStaff=!!(S.coord&&(S.coord.kind==='rides'||S.coord.kind==='both'));
+  }catch(e){S.coord=null;S.rideStaff=false;}
   return S.isAdmin;
 }
 function placeById(id){for(var i=0;i<S.places.length;i++)if(S.places[i].id===id)return S.places[i];return null;}
@@ -524,7 +538,7 @@ function chip(ic,text,gold){return '<span class="chip'+(gold?' t':'')+'">'+icon(
 
 async function render(){
   var r=route(),tok=++renderTok;
-  var tabName=({home:'home',account:'account',taxonomy:'account',complaints:'account',ride:'home',rides:'account',ridestaff:'account',shoporders:'account',staff:'account',orders:'orders',community:'community'})[r.name];
+  var tabName=({home:'home',account:'account',taxonomy:'account',complaints:'account',ride:'home',rides:'account',ridestaff:'account',myprofile:'account',shoporders:'account',staff:'account',orders:'orders',community:'community'})[r.name];
   setActiveTab(tabName||'');
   if(r.name==='orders'){viewOrders();return;}
   if(r.name==='community'){viewCommunity();return;}
@@ -546,6 +560,7 @@ async function render(){
     else if(r.name==='ride')h=await viewRide();
     else if(r.name==='rides')h=await viewRides();
     else if(r.name==='ridestaff')h=await viewRideStaff();
+    else if(r.name==='myprofile')h=await viewMyProfile();
     else{location.hash='#/';return;}
   }catch(e){h={html:header('تعذّر التحميل','','#/')+'<div class="g">'+failedHtml()+'</div>'};}
   if(tok!==renderTok)return;
@@ -906,15 +921,20 @@ async function actRmStaff(uid,pid){
 
 /* ===== المشاوير ===== */
 function rideWaMsg(lat,lng){return 'السلام عليكم، أحتاج مشوارًا.'+(lat!=null?'\nموقعي: https://maps.google.com/?q='+lat+','+lng:'');}
+/* رقما التواصل يضيفهما المالك فقط: واتساب، واتصال. يرجع {wa, call} */
 async function rideContact(){
-  try{var r=await sel('app_settings',{select:'value',key:'eq.ride_whatsapp'});return r&&r[0]?r[0].value:'';}catch(e){return '';}
+  var o={wa:'',call:''};
+  try{(await sel('app_settings',{select:'key,value',key:'in.(ride_whatsapp,ride_call)'})||[]).forEach(function(r){if(r.key==='ride_whatsapp')o.wa=r.value||'';if(r.key==='ride_call')o.call=r.value||'';});}catch(e){}
+  return o;
 }
 async function viewRide(){
   var hd=header('مشوار بالقبطان','اطلب سيارة توصلك إلى أي مكان، ونتفق معك على السعر','#/');
-  var num=await rideContact(),wa=waPhone(num);
+  var rc=await rideContact(),wa=waPhone(rc.wa),callNum=rc.call&&validPhone(rc.call)?rc.call:'';
   var h=hd+'<div class="g">';
-  if(wa){
-    h+='<div class="acc" style="margin-top:16px"><h2>تواصل معنا مباشرة</h2><p>أرسل لنا موقعك على واتساب أو اتصل بنا، وسنتفق معك على السعر.</p><div class="adm" style="padding-top:0"><a class="btn p" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(rideWaMsg(S.loc?S.loc.lat.toFixed(5):null,S.loc?S.loc.lng.toFixed(5):null))+'">'+icon('chat')+'واتساب</a><a class="btn s" href="tel:'+esc(telOf(num))+'">'+icon('phone')+'اتصال</a></div></div>';
+  if(wa||callNum){
+    h+='<div class="acc" style="margin-top:16px"><h2>تواصل معنا مباشرة</h2><p>'+(wa&&callNum?'أرسل لنا موقعك على واتساب أو اتصل بنا':wa?'أرسل لنا موقعك على واتساب':'اتصل بنا')+'، وسنتفق معك على السعر.</p><div class="adm" style="padding-top:0">'+
+      (wa?'<a class="btn p" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(rideWaMsg(S.loc?S.loc.lat.toFixed(5):null,S.loc?S.loc.lng.toFixed(5):null))+'">'+icon('chat')+'واتساب</a>':'')+
+      (callNum?'<a class="btn '+(wa?'s':'p')+'" href="tel:'+esc(telOf(callNum))+'">'+icon('phone')+'اتصال</a>':'')+'</div></div>';
   }
   if(!session){
     h+='<div class="acc" style="margin-top:16px"><h2>أنشئ حسابك أولًا</h2><p>نحتاج اسمك ورقمك ليتواصل معك فريقنا، ولتصلك سيارتك بأمان.</p><button class="btn p block" data-act="signup">إنشاء حساب</button><button class="btn s block" data-act="login">تسجيل الدخول</button></div>';
@@ -936,7 +956,7 @@ async function viewRide(){
       h+='</div>';
     }
   }
-  if(S.isAdmin)h+='<div class="adm"><button class="btn s" data-act="ridenum">'+icon('phone')+'رقم واتساب المشاوير</button></div>';
+  if(S.isAdmin)h+='<div class="acc" style="margin-top:16px"><h2>أرقام التواصل (للمالك)</h2><div class="chips">'+chip('chat','واتساب: '+(wa?arNum(rc.wa):'فارغ'),!!wa)+chip('phone','اتصال: '+(callNum?arNum(callNum):'فارغ'),!!callNum)+'</div><div class="adm" style="padding-top:12px"><button class="btn s" data-act="ridenum">'+icon('phone')+'تعديل أرقام التواصل</button></div></div>';
   return{html:h+'</div>',after:bindRide};
 }
 function bindRide(){
@@ -949,7 +969,7 @@ function bindRide(){
     var m=me(),b=$('rgo');b.disabled=true;
     try{
       await ins('rides',{customer_name:m.name||null,customer_phone:m.phone||null,pickup_lat:S.loc.lat,pickup_lng:S.loc.lng,pickup_note:$('f_pnote').value.trim()||null,destination:dest,passengers:+$('f_pax').value||1,note:$('f_rnote').value.trim()||null});
-      var num=await rideContact(),wa=waPhone(num);
+      var rc=await rideContact(),wa=waPhone(rc.wa);
       setView(header('وصلنا طلبك','','#/')+'<div class="g"><div class="deny">'+patSvg()+'<div class="big">'+icon('car')+'</div><h2>وصلنا طلبك</h2><p>سيتواصل معك فريقنا قريبًا على رقمك لنتفق على السعر وموعد وصول السيارة.</p>'+
         (wa?'<a class="btn p" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(rideWaMsg(S.loc.lat.toFixed(5),S.loc.lng.toFixed(5)))+'">'+icon('chat')+'تواصل معنا على واتساب</a>':'')+
         '<a class="btn s" href="#/">العودة إلى الرئيسية</a></div></div>',false);
@@ -962,11 +982,13 @@ function bindRide(){
 async function actRideNum(){
   if(!await ensureOwner())return;
   var cur=await rideContact();
-  var ok=await formSheet({title:'رقم واتساب المشاوير',text:'يظهر للراكب في شاشة المشاوير ليتواصل معكم مباشرة.',submit:'حفظ الرقم',
-    fields:[{id:'n',label:'الرقم',type:'text',inputmode:'tel',ltr:true,value:cur,hint:'+201000000000'}],
-    validate:function(v){return validPhone(v.n)?'':'اكتب رقمًا صحيحًا';},
-    onSubmit:function(v){return api('POST','/rest/v1/app_settings',{json:{key:'ride_whatsapp',value:westernDigits(v.n).replace(/\s/g,''),updated_at:new Date().toISOString()},headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});}});
-  if(ok){toast('تم حفظ الرقم');render();}
+  var ok=await formSheet({title:'أرقام تواصل المشاوير',text:'يراها الراكب في شاشة المشاوير. اترك أي خانة فارغة لإخفاء زرّها.',submit:'حفظ الأرقام',
+    fields:[{id:'w',label:'رقم الواتساب',type:'text',inputmode:'tel',ltr:true,value:cur.wa,hint:'+201000000000'},{id:'c',label:'رقم الاتصال',type:'text',inputmode:'tel',ltr:true,value:cur.call,hint:'+201000000000'}],
+    validate:function(v){if(v.w.trim()&&!validPhone(v.w))return 'رقم الواتساب غير صحيح';if(v.c.trim()&&!validPhone(v.c))return 'رقم الاتصال غير صحيح';return '';},
+    onSubmit:function(v){
+      var clean=function(x){return x.trim()?westernDigits(x).replace(/\s/g,''):'';},now=new Date().toISOString();
+      return api('POST','/rest/v1/app_settings',{json:[{key:'ride_whatsapp',value:clean(v.w),updated_at:now},{key:'ride_call',value:clean(v.c),updated_at:now}],headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});}});
+  if(ok){toast('تم حفظ الأرقام');render();}
 }
 
 /* صندوق طلبات المشاوير: للمالك والمنسّق */
@@ -1069,30 +1091,86 @@ async function pollRidePrompt(){
 }
 setInterval(pollRidePrompt,10000);
 
-/* منسّقو المشاوير (للمالك فقط) */
+/* ===== المنسّقون (للمالك) وملف المنسّق ===== */
+var KINDS={rides:'مشاوير',delivery:'دليفري',both:'مشاوير ودليفري'};
+var STATUSES={available:'متاح',busy:'مشغول',off:'غير متاح اليوم'};
+function avatarHtml(photo,name,big){return '<span class="av'+(big?' big':'')+'" aria-hidden="true">'+(photo?'<img alt="" src="'+esc(photo)+'">':esc(((name||'').trim()[0])||'؟'))+'</span>';}
+function badgesHtml(){return '<div class="chips">'+chip('user','الشارات تظهر هنا عند الحصول عليها')+'</div>';}
+function kindOptions(){return Object.keys(KINDS).map(function(k){return{value:k,label:KINDS[k]};});}
 async function viewRideStaff(){
-  var hd=header('منسّقو المشاوير','اربط حساب كل منسّق ليرى طلبات المشاوير ويتواصل مع الركاب','#/account');
+  var hd=header('المنسّقون','اربط حساب كل منسّق وحدّد نوع شغله: مشاوير أو دليفري أو الاثنين','#/account');
   if(!session||!(S.isAdmin||await checkAdmin()))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لمالك التطبيق فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
-  var rows=await rpc('list_ride_staff')||[];
+  var rows=await rpc('list_coordinators')||[];
+  var cnt=function(k){return rows.filter(function(r){return r.kind===k||r.kind==='both';}).length;};
   var h=hd+'<div class="g"><div class="adm"><button class="btn p" data-act="addridestaff">'+icon('plus')+'ربط منسّق</button></div>';
+  if(rows.length)h+='<div class="chips" style="padding-top:4px">'+chip('user','الكل: '+arNum(rows.length))+chip('car','مشاوير: '+arNum(cnt('rides')),true)+chip('bag','دليفري: '+arNum(cnt('delivery')),true)+'</div>';
   if(!rows.length)h+='<div class="empty">لم تربط أي منسّق بعد. اطلب منه أن ينشئ حسابه من التطبيق أولًا، ثم اربطه ببريده.</div>';
-  rows.forEach(function(r){h+='<div class="card" style="flex-direction:column;gap:8px"><div class="body"><span class="sc" dir="ltr" style="text-align:right">'+esc(r.email)+'</span></div><div class="adm" style="padding-top:0"><button class="btn d" data-act="rmridestaff" data-id="'+esc(r.user_id)+'">'+icon('trash')+'إلغاء الربط</button></div></div>';});
+  rows.forEach(function(r){
+    h+='<section class="acc" style="margin-top:12px"><div class="prof">'+avatarHtml(r.photo,r.name)+'<div class="pbody"><b>'+esc(r.name||'بدون اسم')+'</b><span class="sc" dir="ltr" style="text-align:right">'+esc(r.email)+'</span>'+(r.phone?'<span class="sc" dir="ltr" style="text-align:right">'+esc(r.phone)+'</span>':'')+'</div></div>'+
+      '<div class="chips">'+chip('car','النوع: '+(KINDS[r.kind]||r.kind),true)+chip('clock','الحالة: '+(STATUSES[r.status]||r.status))+'</div>'+badgesHtml()+
+      '<div class="adm" style="padding-top:0"><button class="btn s" data-act="coordkind" data-id="'+esc(r.user_id)+'" data-kind="'+esc(r.kind)+'">'+icon('edit')+'تغيير النوع</button><button class="btn d" data-act="rmridestaff" data-id="'+esc(r.user_id)+'">'+icon('trash')+'إلغاء الربط</button></div></section>';
+  });
   return{html:h+'</div>'};
 }
 async function actAddRideStaff(){
   if(!await ensureOwner())return;
-  var ok=await formSheet({title:'ربط منسّق مشاوير',text:'يجب أن يكون المنسّق قد أنشأ حسابه في التطبيق ببريده.',submit:'ربط الحساب',
+  var ok=await formSheet({title:'ربط منسّق',text:'يجب أن يكون المنسّق قد أنشأ حسابه في التطبيق ببريده.',submit:'ربط الحساب',
     errText:function(er){return er.noUser?'لم نجد حسابًا بهذا البريد. اطلب منه أن ينشئ حسابه من التطبيق أولًا.':(isDenied(er)?NOT_ALLOWED:'تعذّر الربط الآن، جرّب مرة أخرى');},
-    fields:[{id:'em',label:'بريد المنسّق',type:'email',ltr:true}],
+    fields:[{id:'em',label:'بريد المنسّق',type:'email',ltr:true},{id:'kind',label:'نوع شغله',type:'select',value:'rides',options:kindOptions()}],
     validate:function(v){return /^\S+@\S+\.\S+$/.test(v.em.trim())?'':'اكتب بريدًا إلكترونيًا صحيحًا';},
-    onSubmit:async function(v){var r=await rpc('add_ride_staff',{p_email:v.em.trim()});if(r==='no_user'){var er=new Error('no_user');er.noUser=true;throw er;}}});
+    onSubmit:async function(v){var r=await rpc('add_coordinator',{p_email:v.em.trim(),p_kind:v.kind});if(r==='no_user'){var er=new Error('no_user');er.noUser=true;throw er;}}});
   if(ok){toast('تم ربط المنسّق');render();}
+}
+async function actCoordKind(uid,cur){
+  if(!await ensureOwner())return;
+  var ok=await formSheet({title:'نوع شغل المنسّق',text:'منسّق المشاوير يرى طلبات المشاوير فقط، ومنسّق الدليفري لا يراها.',submit:'حفظ النوع',
+    fields:[{id:'kind',label:'النوع',type:'select',value:cur,options:kindOptions()}],
+    onSubmit:function(v){return rpc('set_coordinator_kind',{p_user:uid,p_kind:v.kind});}});
+  if(ok){toast('تم تغيير النوع');render();}
 }
 async function actRmRideStaff(uid){
   if(!await ensureOwner())return;
-  if(!await confirmSheet('إلغاء الربط','لن يرى صاحب هذا الحساب طلبات المشاوير بعد الآن، ولن يُحذف حسابه.','نعم، ألغِ الربط'))return;
+  if(!await confirmSheet('إلغاء الربط','لن يصل هذا المنسّق إلى أي طلبات بعد الآن، ولن يُحذف حسابه.','نعم، ألغِ الربط'))return;
   try{await api('DELETE','/rest/v1/ride_staff?user_id=eq.'+encodeURIComponent(uid),{headers:{'Prefer':'return=minimal'}});toast('تم إلغاء الربط');}
   catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الإلغاء الآن، جرّب مرة أخرى');}
+  render();
+}
+/* ملف المنسّق: كل منسّق يرى بياناته هو فقط */
+async function viewMyProfile(){
+  var hd=header('ملفي كمنسّق','بياناتك كما يراها فريق القبطان','#/account');
+  if(session&&!S.coord)await checkAdmin();
+  if(!session||!S.coord)return{html:hd+'<div class="g"><div class="empty">هذه الشاشة للمنسّقين فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
+  var r=((await sel('ride_staff',{select:'kind,status,photo',user_id:'eq.'+session.user.id}))||[])[0];
+  if(!r)return{html:hd+'<div class="g"><div class="empty">لم نجد ملفك. تواصل مع مالك التطبيق.</div></div>'};
+  var m=me();
+  var h=hd+'<div class="g"><section class="acc"><div class="prof">'+avatarHtml(r.photo,m.name,true)+'<div class="pbody"><b style="font-size:18px">'+esc(m.name||'منسّق')+'</b><span class="sc" dir="ltr" style="text-align:right">'+esc(m.email)+'</span></div></div>'+
+    '<div class="chips">'+chip('car','شغلك: '+(KINDS[r.kind]||r.kind),true)+'</div>'+
+    '<div class="adm" style="padding-top:0"><button class="btn s" data-act="coordphoto">'+icon('camera')+(r.photo?'تغيير صورتي':'إضافة صورة')+'</button>'+(r.photo?'<button class="btn d" data-act="coordphotodel">'+icon('trash')+'حذف الصورة</button>':'')+'</div></section>'+
+    '<section class="acc"><h2>حالتي</h2><p>اختر حالتك الحالية.</p><div class="row3">'+Object.keys(STATUSES).map(function(k){return '<button class="btn '+(r.status===k?'p':'s')+'" data-act="coordstatus" data-id="'+k+'" aria-pressed="'+(r.status===k)+'">'+STATUSES[k]+'</button>';}).join('')+'</div></section>'+
+    '<section class="acc"><h2>الشارات</h2><p>تظهر شاراتك هنا عندما تحصل عليها.</p>'+badgesHtml()+'</section></div>';
+  return{html:h};
+}
+async function actCoordStatus(k){
+  try{await rpc('coord_set_status',{p_status:k});if(S.coord)S.coord.status=k;toast('تم تحديث حالتك');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى');}
+  render();
+}
+function blobToDataUrl(b){return new Promise(function(res,rej){var f=new FileReader();f.onload=function(){res(f.result);};f.onerror=function(){rej(new Error('read'));};f.readAsDataURL(b);});}
+async function actCoordPhoto(){
+  var ok=await formSheet({title:'صورتي',text:'تظهر صورتك في ملفك لفريق القبطان.',submit:'حفظ الصورة',
+    fields:[{id:'ph',label:'صورتك',type:'image',max:320}],
+    onSubmit:async function(v,blob){
+      if(!blob){var er=new Error('no_photo');throw er;}
+      var d=await blobToDataUrl(blob);
+      if(d.length>58000)throw new Error('too_big');
+      await rpc('coord_set_photo',{p_photo:d});
+    },
+    errText:function(er){return er.message==='no_photo'?'اختر صورة أولًا':(er.message==='too_big'?'الصورة كبيرة، جرّب صورة أخرى':(isDenied(er)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى'));}});
+  if(ok){toast('تم حفظ صورتك');render();}
+}
+async function actCoordPhotoDel(){
+  if(!await confirmSheet('حذف الصورة','سنحذف صورتك من ملفك.','نعم، احذفها'))return;
+  try{await rpc('coord_set_photo',{p_photo:null});toast('تم حذف الصورة');}catch(e){toast('تعذّر الحذف الآن، جرّب مرة أخرى');}
   render();
 }
 
@@ -1190,8 +1268,8 @@ async function viewAccount(){
       '<p>نضيف اسمك ورقمك تلقائيًا إلى رسالة الطلب حتى يتواصل معك المحل بسهولة.</p>'+
       '<button class="btn s block" data-act="editprofile">'+icon('edit')+'تعديل بياناتي</button>'+
       '<button class="btn d block" data-act="logout">تسجيل الخروج</button></div>';
-    if(S.isAdmin)h+='<div class="acc"><h2>أنت مسجّل كمالك</h2><p>يمكنك إضافة المحلات والأقسام والمنتجات وتعديلها من شاشاتها مباشرة.</p><a class="btn s block" href="#/taxonomy">'+icon('tag')+'إدارة الأصناف والفئات</a><a class="btn s block" href="#/complaints">'+icon('bag')+'طلبات تحتاج متابعة</a><a class="btn s block" href="#/staff">'+icon('user')+'حسابات المحلات</a><a class="btn s block" href="#/rides">'+icon('car')+'طلبات المشاوير</a><a class="btn s block" href="#/ridestaff">'+icon('user')+'منسّقو المشاوير</a></div>';
-    if(S.rideStaff&&!S.isAdmin)h+='<div class="acc"><h2>منسّق المشاوير</h2><p>تصلك هنا طلبات المشاوير، وتتواصل مع الراكب لتتفقا على السعر.</p><a class="btn p block" href="#/rides">'+icon('car')+'طلبات المشاوير</a></div>';
+    if(S.isAdmin)h+='<div class="acc"><h2>أنت مسجّل كمالك</h2><p>يمكنك إضافة المحلات والأقسام والمنتجات وتعديلها من شاشاتها مباشرة.</p><a class="btn s block" href="#/taxonomy">'+icon('tag')+'إدارة الأصناف والفئات</a><a class="btn s block" href="#/complaints">'+icon('bag')+'طلبات تحتاج متابعة</a><a class="btn s block" href="#/staff">'+icon('user')+'حسابات المحلات</a><a class="btn s block" href="#/rides">'+icon('car')+'طلبات المشاوير</a><a class="btn s block" href="#/ridestaff">'+icon('user')+'المنسّقون</a></div>';
+    if(S.coord)h+='<div class="acc"><h2>أنت منسّق</h2><div class="chips">'+chip('car','شغلك: '+(KINDS[S.coord.kind]||S.coord.kind),true)+chip('clock','حالتك: '+(STATUSES[S.coord.status]||''))+'</div><a class="btn s block" href="#/myprofile">'+icon('user')+'ملفي كمنسّق</a>'+(S.rideStaff?'<p>تصلك هنا طلبات المشاوير، وتتواصل مع الراكب لتتفقا على السعر.</p><a class="btn p block" href="#/rides">'+icon('car')+'طلبات المشاوير</a>':'')+'</div>';
     if(S.shops.length)h+='<div class="acc"><h2>حساب محل</h2><div class="chips">'+S.shops.map(function(x){return chip('tag',x.name,true)}).join('')+'</div><p>تصلك هنا طلبات محلك، وتؤكد استلامها بضغطة واحدة.</p><a class="btn p block" href="#/shoporders">'+icon('bag')+'الطلبات الواردة</a></div>';
   }else{
     h+='<div class="acc"><h2>أهلًا بك في القبطان</h2><p>أنشئ حسابك لتحفظ اسمك ورقمك، فيصل طلبك إلى المحل أسرع وأسهل.</p>'+
@@ -1264,9 +1342,10 @@ function fileToJpeg(file,max){
 /* نموذج عام: حقول، وصورة اختيارية بين الحقول، وزر حفظ */
 function formSheet(o){
   return new Promise(function(resolve){
-    var blob=null,inner='<h2>'+esc(o.title)+'</h2>'+(o.text?'<p>'+esc(o.text)+'</p>':'')+'<form id="sf" novalidate>';
+    var blob=null,imgMax=1600,inner='<h2>'+esc(o.title)+'</h2>'+(o.text?'<p>'+esc(o.text)+'</p>':'')+'<form id="sf" novalidate>';
     o.fields.forEach(function(f){
       if(f.type==='image'){
+        imgMax=f.max||1600;
         inner+='<div class="field"><span class="lbl">'+esc(f.label)+'</span><div class="imgbox" id="imgBox">'+(f.url?'<img alt="" src="'+esc(f.url)+'">':'<div class="ph">'+icon('image')+'<span>لم تُضف صورة بعد</span></div>')+'</div>'+
           '<div class="row2"><button type="button" class="btn s" id="btnCam">'+icon('camera')+'التقاط صورة</button><button type="button" class="btn s" id="btnGal">'+icon('image')+'من المعرض</button></div>'+
           '<input type="file" id="fileCam" accept="image/*" capture="environment" hidden><input type="file" id="fileGal" accept="image/*" hidden></div>';
@@ -1277,7 +1356,7 @@ function formSheet(o){
     function done(v){closeSheet();pending=null;resolve(v);}
     $('sfNo').addEventListener('click',function(){done(false);});
     if($('btnCam')){
-      var pick=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;fileToJpeg(f,1600).then(function(b){blob=b;var box=$('imgBox');box.innerHTML='';var im=document.createElement('img');im.alt='';im.src=URL.createObjectURL(b);box.appendChild(im);}).catch(function(){toast('تعذّر قراءة الصورة، جرّب صورة أخرى');});};
+      var pick=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;fileToJpeg(f,imgMax).then(function(b){blob=b;var box=$('imgBox');box.innerHTML='';var im=document.createElement('img');im.alt='';im.src=URL.createObjectURL(b);box.appendChild(im);}).catch(function(){toast('تعذّر قراءة الصورة، جرّب صورة أخرى');});};
       $('btnCam').addEventListener('click',function(){$('fileCam').click();});
       $('btnGal').addEventListener('click',function(){$('fileGal').click();});
       $('fileCam').addEventListener('change',pick);$('fileGal').addEventListener('change',pick);
@@ -1551,7 +1630,7 @@ function changeQty(id,d){
 }
 async function actLogout(){
   try{if(session)await fetch(BASE+'/auth/v1/logout',{method:'POST',headers:authHeaders()});}catch(e){}
-  saveSession(null);S.isAdmin=false;S.shops=[];S.rideStaff=false;toast('تم تسجيل الخروج');render();
+  saveSession(null);S.isAdmin=false;S.shops=[];S.rideStaff=false;S.coord=null;toast('تم تسجيل الخروج');render();
 }
 
 /* ===== التقاط النقرات ===== */
@@ -1592,6 +1671,10 @@ document.addEventListener('click',function(e){
   else if(a==='ridedone')actRideDone(id,el.getAttribute('data-v')==='1');
   else if(a==='addridestaff')actAddRideStaff();
   else if(a==='rmridestaff')actRmRideStaff(id);
+  else if(a==='coordkind')actCoordKind(id,el.getAttribute('data-kind'));
+  else if(a==='coordstatus')actCoordStatus(id);
+  else if(a==='coordphoto')actCoordPhoto();
+  else if(a==='coordphotodel')actCoordPhotoDel();
   else if(a==='addstaff')actAddStaff();
   else if(a==='rmstaff')actRmStaff(el.getAttribute('data-id'),el.getAttribute('data-place'));
   else if(a==='delpost')actDelPost(id);
