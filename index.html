@@ -194,6 +194,8 @@ a{color:inherit;text-decoration:none}
 .flbl{margin:14px 0 4px;font-size:13px;font-weight:700;color:var(--fg-2)}
 .feat{margin:0;font-size:15px;line-height:1.9}
 .strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+.strip.s4{grid-template-columns:repeat(2,1fr)}
+.note-warn{margin:0;font-size:13px;line-height:1.7;color:var(--gold-ink);background:var(--gold-soft);padding:8px 12px;border-radius:12px}
 .info{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:12px 6px;background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);text-align:center;min-width:0}
 .info .ic{width:22px;height:22px;color:var(--primary)}
 .info .l{font-size:11px;color:var(--fg-2)}
@@ -454,38 +456,61 @@ function isDenied(e){return !!e&&(e.status===401||e.status===403||e.code==='4250
 var CKEY='captain_cart',OKEY='captain_orders';
 function lsGet(k,d){try{var v=JSON.parse(localStorage.getItem(k)||'null');return v==null?d:v;}catch(e){return d;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
-var cart=lsGet(CKEY,null);if(cart&&!Array.isArray(cart.items))cart=null;
+var cart=lsGet(CKEY,null);
+if(cart&&Array.isArray(cart.items))cart={shops:[{placeId:cart.placeId,placeName:cart.placeName,whatsapp:cart.whatsapp||'',phone:'',prep:cart.prep,lat:cart.lat,lng:cart.lng,items:cart.items}]};
+else if(cart&&!Array.isArray(cart.shops))cart=null;
 var orders=lsGet(OKEY,[]);if(!Array.isArray(orders))orders=[];
 function saveCart(){lsSet(CKEY,cart);updateBadge();}
-function cartCount(){return cart?cart.items.reduce(function(a,i){return a+i.qty},0):0;}
+function cartCount(){return cart?cart.shops.reduce(function(a,s){return a+s.items.reduce(function(b,i){return b+i.qty},0)},0):0;}
 function cartTotal(items){return items.reduce(function(a,i){return a+(i.price==null?0:i.price*i.qty)},0);}
+function cartTotalAll(){return cart?cart.shops.reduce(function(a,s){return a+cartTotal(s.items)},0):0;}
 function updateBadge(){var b=$('bdg');if(!b)return;var n=cartCount();b.hidden=!n;b.textContent=arNum(n);}
-function orderMessage(){
-  var L=['السلام عليكم، أود طلب ما يلي من القبطان:',''];
-  cart.items.forEach(function(i){L.push('- '+i.name+' × '+arNum(i.qty)+(i.price==null?'':' = '+arPrice(i.price*i.qty)));});
-  L.push('','الإجمالي: '+arPrice(cartTotal(cart.items)));
-  var m=me();if(m.name)L.push('الاسم: '+m.name);if(m.phone)L.push('رقم الموبايل: '+arNum(m.phone));
-  if(S.loc)L.push('موقعي: https://maps.google.com/?q='+S.loc.lat.toFixed(5)+','+S.loc.lng.toFixed(5));
-  L.push('شكرًا لكم.');
-  return L.join('\n');
+/* السلة الواحدة تضم منتجات من عدة محلات، وكل محل له مجموعته */
+function addItemsToShop(pl,items){
+  if(!cart)cart={shops:[]};
+  var sh=cart.shops.find(function(x){return x.placeId===pl.id;});
+  if(!sh){sh={placeId:pl.id,placeName:pl.name,whatsapp:pl.whatsapp||'',phone:pl.phone||'',prep:pl.prep_minutes,lat:pl.lat,lng:pl.lng,items:[]};cart.shops.push(sh);}
+  items.forEach(function(n){var ex=sh.items.find(function(i){return i.id===n.id;});if(ex)ex.qty+=n.qty;else sh.items.push(n);});
 }
-async function finalizeOrder(ch){
-  if(!cart||!cart.items.length)return;
-  var c=cart,total=cartTotal(c.items),m=me(),saved=false;
-  var km=(S.loc&&c.lat!=null)?haversine(S.loc.lat,S.loc.lng,c.lat,c.lng):0,eta=(c.prep||0)+Math.round(km*3)+5;
-  if(session){
-    var row={customer_name:m.name||null,customer_phone:m.phone||null,place_id:c.placeId,place_name:c.placeName,place_whatsapp:c.whatsapp||null,items:c.items,total:total,eta_minutes:eta};
-    try{await ins('orders',Object.assign({},row,S.loc?{customer_lat:S.loc.lat,customer_lng:S.loc.lng}:{}));saved=true;}
-    catch(e){try{await ins('orders',row);saved=true;}catch(e2){}}
+function newGroupId(){
+  try{if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();}catch(e){}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==='x'?r:(r&3|8);return v.toString(16);});
+}
+/* الرقم يلزم قبل إرسال الطلب، لأن مسؤول المحل يتواصل به معك */
+async function askPhone(){
+  return formSheet({title:'رقم موبايلك',text:'تأكد من ملكية هذا الرقم لأننا سنستخدمه في التواصل.',submit:'حفظ الرقم ومتابعة الطلب',
+    fields:[{id:'ph',label:'رقم الموبايل',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000'}],
+    validate:function(v){return validPhone(v.ph)?'':'اكتب رقم موبايل صحيحًا';},
+    onSubmit:async function(v){
+      var m=me();
+      var u=await api('PUT','/auth/v1/user',{json:{data:{name:m.name,phone:westernDigits(v.ph).replace(/\s/g,'')}}});
+      saveSession(Object.assign({},session,{user:u}));
+    }});
+}
+/* إرسال الطلب مرة واحدة: يصل لكل محل صفٌّ خاص به فيه منتجاته واسمك ورقمك وبريدك */
+async function sendAllOrders(){
+  if(!cartCount())return;
+  if(!session){toast('أنشئ حسابك أولًا ليصل طلبك للمحلات');location.hash='#/account';return;}
+  var m=me();
+  if(!m.phone){if(!await askPhone())return;m=me();}
+  var gid=newGroupId();
+  var rows=cart.shops.map(function(sh){
+    var km=(S.loc&&sh.lat!=null)?haversine(S.loc.lat,S.loc.lng,sh.lat,sh.lng):0;
+    return{group_id:gid,customer_name:m.name||null,customer_phone:m.phone||null,customer_email:m.email||null,place_id:sh.placeId,place_name:sh.placeName,place_whatsapp:sh.whatsapp||null,items:sh.items,total:cartTotal(sh.items),eta_minutes:(sh.prep||0)+Math.round(km*3)+5,customer_lat:S.loc?S.loc.lat:null,customer_lng:S.loc?S.loc.lng:null};
+  });
+  function strip(keys){return rows.map(function(r){var c=Object.assign({},r);keys.forEach(function(k){delete c[k];});return c;});}
+  /* لو لم يُشغَّل ملف SQL الخاص بالمرحلة ٢ بعد، نرسل الطلب بدون الأعمدة الجديدة بدل أن يفشل */
+  var attempts=[rows,strip(['group_id','customer_email']),strip(['group_id','customer_email','customer_lat','customer_lng'])];
+  var b=document.querySelector('[data-act=sendall]');if(b)b.disabled=true;
+  var ok=false;
+  for(var i=0;i<attempts.length&&!ok;i++){
+    try{await api('POST','/rest/v1/orders',{json:attempts[i],headers:{'Prefer':'return=minimal'}});ok=true;}
+    catch(e){if(!/column|schema cache/i.test(e.message||''))break;}
   }
-  if(!saved){
-    orders.unshift({id:Date.now(),at:Date.now(),placeId:c.placeId,placeName:c.placeName,whatsapp:c.whatsapp||'',prep:c.prep,lat:c.lat,lng:c.lng,items:c.items,total:total});
-    orders=orders.slice(0,30);lsSet(OKEY,orders);
-  }
-  cart=null;saveCart();
-  var how=ch==='call'?'سجّلنا طلبك، وبعد مكالمتك للمحل يؤكد لك التفاصيل':'جهّزنا رسالة طلبك في واتساب';
-  toast(saved?how+'، وأضفنا الطلب إلى طلباتك الجارية':how+'، وحفظنا الطلب في سجلك');
-  if(route().name==='orders')render();
+  if(!ok){if(b)b.disabled=false;toast('تعذّر إرسال طلبك الآن، جرّب مرة أخرى');return;}
+  var n=cart.shops.length;cart=null;saveCart();
+  toast('وصل طلبك إلى '+(n===1?'المحل':n===2?'المحلين':arNum(n)+' محلات')+'، وسيتواصل معك مسؤول '+(n===1?'المحل':'كل محل')+' على رقمك');
+  render();
 }
 
 /* ===== الحالة ===== */
@@ -670,7 +695,10 @@ function renderSugg(){
 /* ===== المحل ===== */
 async function viewPlace(id){
   var r=await Promise.all([
-    sel('places',{select:'id,name,category_id,whatsapp,prep_minutes,lat,lng,categories(label,icon_key)',id:'eq.'+id},true),
+    (async function(){
+      try{var x=await sel('places',{select:'id,name,category_id,whatsapp,phone,prep_minutes,lat,lng,categories(label,icon_key)',id:'eq.'+id},true);window.__placeHasPhone=true;return x;}
+      catch(e){window.__placeHasPhone=false;return sel('places',{select:'id,name,category_id,whatsapp,prep_minutes,lat,lng,categories(label,icon_key)',id:'eq.'+id},true);}
+    })(),
     sel('sections',{select:'id,name,sort_order,products(count)',place_id:'eq.'+id,order:'sort_order.asc,name.asc'})
   ]);
   var pl=r[0],secs=r[1]||[];
@@ -713,15 +741,17 @@ async function viewSection(id){
 }
 function productCard(p,placeName){
   var u=imgUrl(p.image_path);
-  return '<a class="card" href="#/product/'+encodeURIComponent(p.id)+'"><span class="thumb sq">'+patSvg()+icon('bag')+(u?'<img alt="" loading="lazy" src="'+esc(u)+'" onerror="this.remove()">':'')+'</span><span class="body"><span class="nm">'+esc(p.name)+'</span>'+(placeName?'<span class="sc">'+esc(placeName)+'</span>':'')+'<span class="chips">'+chip('tag',p.price==null?'السعر عبر واتساب أو اتصال':arPrice(p.price),true)+'</span></span></a>';
+  return '<a class="card" href="#/product/'+encodeURIComponent(p.id)+'"><span class="thumb sq">'+patSvg()+icon('bag')+(u?'<img alt="" loading="lazy" src="'+esc(u)+'" onerror="this.remove()">':'')+'</span><span class="body"><span class="nm">'+esc(p.name)+'</span>'+(placeName?'<span class="sc">'+esc(placeName)+'</span>':'')+'<span class="chips">'+chip('tag',p.price==null?'السعر لم يُحدَّد بعد':arPrice(p.price),true)+'</span></span></a>';
 }
 
 /* ===== المنتج ===== */
 var cur={};
 async function viewProduct(id){
-  var SEC='sections(id,name,place_id,places(id,name,whatsapp,prep_minutes,lat,lng))',p;
-  try{p=await sel('products',{select:'*,items(name,families(name)),'+SEC,id:'eq.'+id},true);}
-  catch(e){p=await sel('products',{select:'*,'+SEC,id:'eq.'+id},true);}
+  var p,tries=[['items(name,families(name)),',true],['',true],['items(name,families(name)),',false],['',false]];
+  for(var ti=0;ti<tries.length&&!p;ti++){
+    var SEC='sections(id,name,place_id,places(id,name,whatsapp,'+(tries[ti][1]?'phone,':'')+'prep_minutes,lat,lng))';
+    try{p=await sel('products',{select:'*,'+tries[ti][0]+SEC,id:'eq.'+id},true);}catch(e){if(ti===tries.length-1)throw e;}
+  }
   var sc=p.sections||{},pl=sc.places||null;
   cur={product:p,section:sc,place:pl};
   var u=imgUrl(p.image_path);
@@ -735,15 +765,17 @@ async function viewProduct(id){
   h+='<div class="pimg">'+icon('bag')+(u?'<img alt="'+esc(p.name)+'" src="'+esc(u)+'" onerror="this.remove()">':'')+'</div>';
   h+='<h1 class="ptitle">'+esc(p.name)+'</h1>';
   h+='<div class="flbl">مميزات المنتج</div><p class="feat">'+(p.features&&p.features.trim()?nl2br(p.features):'ستجد هنا مميزات المنتج قريبًا.')+'</p>';
-  /* الترتيب من اليمين إلى اليسار: سعر المنتج، وقت التوصيل، رقم الواتس */
-  h+='<div class="strip">'+
-    '<div class="info">'+icon('tag')+'<span class="l">سعر المنتج</span><span class="v">'+(p.price==null?'واتساب أو اتصال':arPrice(p.price))+'</span></div>'+
+  /* الترتيب من اليمين إلى اليسار: سعر المنتج، وقت التوصيل، رقم الواتس، رقم الاتصال. الخانات الفارغة يملؤها المالك فقط */
+  var ph=pl&&pl.phone?pl.phone:'',phDigits=westernDigits(ph).replace(/[^0-9]/g,'');
+  h+='<div class="strip s4">'+
+    '<div class="info">'+icon('tag')+'<span class="l">سعر المنتج</span><span class="v">'+(p.price==null?'لم يُحدَّد بعد':arPrice(p.price))+'</span></div>'+
     '<div class="info">'+icon('clock')+'<span class="l">وقت التوصيل</span><span class="v">'+esc(eta)+'</span></div>'+
-    '<div class="info">'+icon('chat')+'<span class="l">رقم الواتس</span><span class="v'+(wa?' ltr':'')+'">'+(wa?esc(arNum(wa)):'لم يُضف بعد')+'</span></div></div>';
-  if(waDigits)h+='<div class="row2" style="margin-top:12px"><a class="btn p" href="https://wa.me/'+waDigits+'" target="_blank" rel="noopener">'+icon('chat')+'واتساب</a><a class="btn s" href="tel:'+esc(telOf(wa))+'">'+icon('phone')+'اتصال</a></div>';
-  h+='<button class="btn s block" style="margin-top:12px" data-act="addcart">'+icon('bag')+'أضف إلى طلبي</button>';
+    '<div class="info">'+icon('chat')+'<span class="l">رقم الواتس</span><span class="v'+(wa?' ltr':'')+'">'+(wa?esc(arNum(wa)):'لم يُضف بعد')+'</span></div>'+
+    '<div class="info">'+icon('phone')+'<span class="l">رقم الاتصال</span><span class="v'+(ph?' ltr':'')+'">'+(ph?esc(arNum(ph)):'لم يُضف بعد')+'</span></div></div>';
+  if(waDigits||phDigits)h+='<div class="row2" style="margin-top:12px">'+(waDigits?'<a class="btn p" href="https://wa.me/'+waDigits+'" target="_blank" rel="noopener">'+icon('chat')+'واتساب</a>':'')+(phDigits?'<a class="btn s" href="tel:'+esc(telOf(ph))+'">'+icon('phone')+'اتصال</a>':'')+'</div>';
+  h+='<button class="btn p block" style="margin-top:12px" data-act="addcart">'+icon('bag')+'إضافة للسلة</button>';
   if(S.isAdmin)h+='<div class="chips" style="padding-top:12px">'+(p.items?chip('tag','الصنف: '+p.items.name)+(p.items.families?chip('tag','الفئة: '+p.items.families.name,true):''):chip('tag','غير مرتبط بصنف بعد',true))+'<a class="chip" href="#/taxonomy">'+icon('edit')+'إدارة الأصناف والفئات</a></div>';
-  if(S.isAdmin)h+='<div class="adm"><button class="btn s" data-act="editproduct">'+icon('edit')+'تعديل المنتج</button><button class="btn d" data-act="delproduct">'+icon('trash')+'حذف المنتج</button></div>';
+  if(S.isAdmin)h+='<div class="adm"><button class="btn s" data-act="editprice">'+icon('tag')+'تعديل السعر</button><button class="btn s" data-act="editshopnums">'+icon('phone')+'أرقام المحل</button><button class="btn s" data-act="editproduct">'+icon('edit')+'تعديل المنتج</button><button class="btn d" data-act="delproduct">'+icon('trash')+'حذف المنتج</button></div>';
   /* تقييم بوجهين خطيين (وليس إيموجي) */
   h+='<div class="react"><h3>ما رأيك في هذا المنتج؟</h3><div class="row">'+
     '<button class="face yes" data-act="like" data-id="'+esc(p.id)+'"><span class="b">'+icon('smile')+'</span>أعجبني</button>'+
@@ -798,21 +830,24 @@ async function viewOrders(){
   if(tok!==renderTok)return;
   ordIdx={};
   var h='<header class="hdr">'+patSvg()+'<div class="hdr-top"><h1 style="padding:8px 12px">طلباتي</h1></div></header><div class="g">';
-  if(cart&&cart.items.length){
-    var total=cartTotal(cart.items),unp=cart.items.some(function(i){return i.price==null});
-    var digits=westernDigits(cart.whatsapp||'').replace(/[^0-9]/g,'');
-    h+='<div class="sec-head"><h2>طلبك الحالي</h2><span>'+esc(cart.placeName)+'</span></div><div class="card basket">';
-    cart.items.forEach(function(i){
-      h+='<div class="ci"><div class="cn"><b>'+esc(i.name)+'</b><span>'+(i.price==null?'السعر عبر واتساب أو اتصال':arPrice(i.price))+'</span></div>'+
-        '<div class="qty"><button type="button" data-act="qty" data-id="'+esc(i.id)+'" data-d="1" aria-label="زيادة الكمية">'+icon('plus')+'</button><output aria-label="الكمية">'+arNum(i.qty)+'</output><button type="button" data-act="qty" data-id="'+esc(i.id)+'" data-d="-1" aria-label="إنقاص الكمية">'+icon(i.qty===1?'trash':'minus')+'</button></div></div>';
+  if(cartCount()){
+    h+='<div class="sec-head"><h2>سلتك</h2></div>';
+    cart.shops.forEach(function(sh){
+      var sub=cartTotal(sh.items),unp=sh.items.some(function(i){return i.price==null});
+      h+='<div class="sec-head"><h2>'+esc(sh.placeName)+'</h2></div><div class="card basket">';
+      sh.items.forEach(function(i){
+        h+='<div class="ci"><div class="cn"><b>'+esc(i.name)+'</b><span>'+(i.price==null?'السعر لم يُحدَّد بعد':arPrice(i.price))+'</span></div>'+
+          '<div class="qty"><button type="button" data-act="qty" data-id="'+esc(i.id)+'" data-d="1" aria-label="زيادة الكمية">'+icon('plus')+'</button><output aria-label="الكمية">'+arNum(i.qty)+'</output><button type="button" data-act="qty" data-id="'+esc(i.id)+'" data-d="-1" aria-label="إنقاص الكمية">'+icon(i.qty===1?'trash':'minus')+'</button></div></div>';
+      });
+      h+='<div class="sum"><span>إجمالي هذا المحل'+(unp?' (دون المنتجات بلا سعر)':'')+'</span><span>'+arPrice(sub)+'</span></div>';
+      if(S.loc&&sh.lat!=null)h+='<div class="sum sm"><span>وقت التوصيل المتوقع</span><span>'+etaText(sh.prep,haversine(S.loc.lat,S.loc.lng,sh.lat,sh.lng))+'</span></div>';
+      h+='</div>';
     });
-    h+='<div class="sum"><span>الإجمالي'+(unp?' (دون المنتجات بلا سعر)':'')+'</span><span>'+arPrice(total)+'</span></div>';
-    if(S.loc&&cart.lat!=null)h+='<div class="sum sm"><span>وقت التوصيل المتوقع</span><span>'+etaText(cart.prep,haversine(S.loc.lat,S.loc.lng,cart.lat,cart.lng))+'</span></div>';
-    h+='</div>';
-    if(digits)h+='<a class="btn p block gold-btn" data-act="sendorder" target="_blank" rel="noopener" href="https://wa.me/'+digits+'?text='+encodeURIComponent(orderMessage())+'">'+icon('chat')+'أرسل الطلب عبر واتساب</a><a class="btn s block gold-btn" data-act="sendorder" data-ch="call" href="tel:'+esc(telOf(cart.whatsapp))+'">'+icon('phone')+'أو اتصل بالمحل</a>';
-    else h+='<div class="empty">لم يُضف المحل رقم واتساب بعد، فلا نستطيع تجهيز الرسالة الآن.</div>';
+    if(cart.shops.length>1)h+='<div class="sec-head"><h2>إجمالي السلة</h2><span>'+arPrice(cartTotalAll())+'</span></div>';
+    h+='<button class="btn p block gold-btn" data-act="sendall">'+icon('wheel')+'ارسل طلبك للمحلات</button>';
+    if(!session)h+='<p class="note-warn" style="margin-top:10px">سجّل دخولك أو أنشئ حسابك من تبويب حسابي ليصل طلبك للمحلات.</p>';
     h+='<button class="btn s block gold-btn" data-act="clearcart">تفريغ السلة</button>'+
-       '<p class="foot" style="padding-top:10px;font-size:13px;color:var(--fg-2)">يؤكد لك المحل السعر النهائي ووقت الوصول عبر واتساب.</p>';
+       '<p class="foot" style="padding-top:10px;font-size:13px;color:var(--fg-2)">يصل طلب كل محل إلى مسؤوله، فيتواصل معك على رقمك ليؤكد المتوفر والسعر النهائي.</p>';
   }else{
     h+='<div class="deny">'+patSvg()+'<div class="big">'+icon('bag')+'</div><h2>سلتك فارغة</h2><p>اختر ما يسرّك من المحلات، وأضفه إلى طلبك من شاشة المنتج.</p><a class="btn p" href="#/">تصفّح المحلات</a></div>';
   }
@@ -840,7 +875,6 @@ async function actAnswer(id,v){
 async function actReorder(id){
   var o=ordIdx[id];if(!o)return;
   var pid=o.place_id;if(!pid){toast('تعذّر العثور على المحل، اختر طلبك من جديد');return;}
-  if(cart&&cart.items.length&&!await confirmSheet('استبدال السلة','سلتك الحالية فيها منتجات. هل نستبدلها بهذا الطلب؟','نعم، استبدلها',true))return;
   try{
     var pl=await sel('places',{select:'id,name,whatsapp,prep_minutes,lat,lng',id:'eq.'+pid},true);
     var pr=await sel('products',{select:'id,name,price',id:'in.('+o.items.map(function(i){return i.id}).join(',')+')'})||[];
@@ -848,8 +882,8 @@ async function actReorder(id){
     var items=[],miss=0;
     o.items.forEach(function(i){var x=by[i.id];if(x)items.push({id:x.id,name:x.name,price:x.price==null?null:Number(x.price),qty:i.qty});else miss++;});
     if(!items.length){toast('هذه المنتجات لم تعد متاحة، اختر غيرها من المحل');location.hash='#/place/'+encodeURIComponent(pid);return;}
-    cart={placeId:pl.id,placeName:pl.name,whatsapp:pl.whatsapp||'',prep:pl.prep_minutes,lat:pl.lat,lng:pl.lng,items:items};
-    saveCart();toast(miss?'أعدنا ما توفر من طلبك بأسعاره الحالية، وبعض المنتجات لم تعد متاحة':'أعدنا طلبك بأسعاره الحالية، ويمكنك تعديله قبل الإرسال');
+    addItemsToShop(pl,items);
+    saveCart();toast(miss?'أضفنا ما توفر من طلبك إلى سلتك بأسعاره الحالية، وبعض المنتجات لم تعد متاحة':'أضفنا طلبك إلى سلتك بأسعاره الحالية، ويمكنك تعديله قبل الإرسال');
     render();window.scrollTo(0,0);
   }catch(e){toast('تعذّر إعادة الطلب الآن، جرّب مرة أخرى');}
 }
@@ -884,10 +918,11 @@ async function shopOrdersHtml(){
   var done=rows.filter(function(o){return fresh.indexOf(o)<0&&going.indexOf(o)<0&&comp.indexOf(o)<0;}).slice(0,15);
   function contact(o){
     var wa=waPhone(o.customer_phone),map=(o.customer_lat!=null&&o.customer_lng!=null)?'https://maps.google.com/?q='+o.customer_lat+','+o.customer_lng:'';
-    return (o.customer_phone?'<a class="btn s" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'">'+icon('chat')+'واتساب</a>':'')+(map?'<a class="btn s" target="_blank" rel="noopener" href="'+map+'">'+icon('pin')+'الموقع</a>':'');
+    var wmsg='السلام عليكم يا '+(o.customer_name||'')+'، معك مسؤول '+o.place_name+' من القبطان بخصوص طلبك: '+o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، ')+'. سنتأكد معك الآن من المتوفر.';
+    return (o.customer_phone?'<a class="btn s" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(wmsg)+'">'+icon('chat')+'واتساب</a>':'')+(map?'<a class="btn s" target="_blank" rel="noopener" href="'+map+'">'+icon('pin')+'الموقع</a>':'');
   }
   function card(o,extra,btn){
-    return '<section class="acc"><h2>'+esc(o.customer_name||'زبون')+'</h2><div class="chips">'+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+chip('clock',dateAr(o.created_at))+chip('tag',arPrice(o.total),true)+(extra||'')+'</div><p>'+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'</p><div class="adm" style="padding-top:0">'+(btn||'')+contact(o)+'</div></section>';
+    return '<section class="acc"><h2>'+esc(o.customer_name||'زبون')+'</h2><div class="chips">'+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+(o.customer_email?chip('chat',o.customer_email):'')+chip('clock',dateAr(o.created_at))+chip('tag',arPrice(o.total),true)+(extra||'')+'</div><p>'+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'</p><div class="adm" style="padding-top:0">'+(btn||'')+contact(o)+'</div></section>';
   }
   var h=hd+'<div class="g">';
   h+='<div class="sec-head"><h2>طلبات جديدة تنتظر تأكيدك</h2></div>';
@@ -909,6 +944,22 @@ async function refreshShop(){
     lastPending=r.pending;$('view').innerHTML=r.html;}catch(e){}
 }
 setInterval(refreshShop,30000);
+/* رسالة لمسؤول المحل فور وصول طلب جديد، وهو يفتح التطبيق */
+async function pollShopPrompt(){
+  if(!session||!S.shops.length||document.hidden||$('scrim'))return;
+  try{
+    var rows=await sel('orders',{select:'id,customer_name,place_name,items,created_at',status:'eq.sent',place_id:'in.('+S.shops.map(function(x){return x.id}).join(',')+')',order:'created_at.asc',limit:'10'})||[];
+    var seen=lsGet('captain_shop_seen',[]),now=Date.now();if(!Array.isArray(seen))seen=[];
+    var o=rows.find(function(x){return seen.indexOf(x.id)<0&&now-new Date(x.created_at).getTime()<3*3600000;});
+    if(!o||$('scrim'))return;
+    seen.push(o.id);lsSet('captain_shop_seen',seen.slice(-60));
+    rideBeep();
+    openSheet('<h2>وصلك طلب جديد</h2><p>من <b>'+esc(o.customer_name||'زبون')+'</b> إلى «'+esc(o.place_name)+'»: '+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'.</p><div class="acts"><button class="btn p block" id="spOpen">افتح الطلبات الواردة</button><button class="btn s block" id="spLater">لاحقًا</button></div>',true,null);
+    $('spOpen').addEventListener('click',function(){closeSheet();pending=null;location.hash='#/shoporders';});
+    $('spLater').addEventListener('click',function(){closeSheet();pending=null;});
+  }catch(e){}
+}
+setInterval(pollShopPrompt,15000);
 async function actReceive(id){
   try{await rpc('shop_receive_order',{p_id:id});toast('تم تسجيل استلام الطلب');}
   catch(e){toast('تعذّر تسجيل الاستلام الآن، جرّب مرة أخرى');}
@@ -1300,7 +1351,7 @@ async function viewAccount(){
     var m=me();
     h+='<div class="acc"><h2>'+esc(m.name?('أهلًا بك يا '+m.name):'أهلًا بك في القبطان')+'</h2>'+
       '<div class="chips">'+(m.phone?chip('phone',arNum(m.phone)):'')+chip('chat',m.email)+(S.isAdmin?chip('lock','مالك التطبيق',true):'')+'</div>'+
-      '<p>نضيف اسمك ورقمك تلقائيًا إلى رسالة الطلب حتى يتواصل معك المحل بسهولة.</p>'+
+      '<form id="phf" novalidate>'+fieldHtml({id:'ph',label:'رقم موبايلك',type:'text',inputmode:'tel',ltr:true,value:m.phone,hint:'+201000000000'})+'<p class="note-warn">تأكد من ملكية هذا الرقم لأننا سنستخدمه في التواصل</p><button class="btn s block" type="submit" id="phGo" style="margin-top:10px">'+icon('phone')+(m.phone?'تحديث الرقم':'حفظ الرقم')+'</button></form>'+
       '<button class="btn s block" data-act="editprofile">'+icon('edit')+'تعديل بياناتي</button>'+
       '<button class="btn d block" data-act="logout">تسجيل الخروج</button></div>';
     h+=accountsHtml(false);
@@ -1321,6 +1372,17 @@ async function viewAccount(){
   }
   setView(h+'</div>',true);
   setActiveTab('account');
+  var phf=$('phf');
+  if(phf)phf.addEventListener('submit',async function(e){
+    e.preventDefault();
+    var v=$('f_ph').value;
+    if(!validPhone(v)){toast('اكتب رقم موبايل صحيحًا');return;}
+    var b=$('phGo');b.disabled=true;
+    try{
+      var u=await api('PUT','/auth/v1/user',{json:{data:{name:me().name,phone:westernDigits(v).replace(/\s/g,'')}}});
+      saveSession(Object.assign({},session,{user:u}));toast('تم حفظ رقمك');render();
+    }catch(x){b.disabled=false;toast('تعذّر الحفظ الآن، جرّب مرة أخرى');}
+  });
   var na=$('naf');
   if(na)na.addEventListener('submit',async function(e){
     e.preventDefault();
@@ -1530,12 +1592,18 @@ function placeFields(p){
     {id:'name',label:'اسم المحل',type:'text',value:p.name||''},
     {id:'cat',label:'نوع المحل',type:'select',value:p.category_id,options:S.cats.map(function(c){return{value:c.id,label:c.label}})},
     {id:'wa',label:'رقم الواتس الخاص بالمحل',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000',value:p.whatsapp||''},
+    {id:'phone',label:'رقم الاتصال الخاص بالمحل',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000',value:p.phone||''},
     {id:'prep',label:'زمن تجهيز الطلب بالدقائق',type:'text',inputmode:'numeric',value:arNum(p.prep_minutes==null?15:p.prep_minutes)},
     {id:'lat',label:'خط العرض',type:'text',inputmode:'decimal',ltr:true,value:p.lat==null?'':arNum(Number(p.lat).toFixed(5))},
     {id:'lng',label:'خط الطول',type:'text',inputmode:'decimal',ltr:true,value:p.lng==null?'':arNum(Number(p.lng).toFixed(5))}
   ];
 }
-function placeRow(v){return{name:v.name.trim(),category_id:v.cat,whatsapp:westernDigits(v.wa).replace(/\s/g,'')||null,prep_minutes:Math.round(num(v.prep)),lat:num(v.lat),lng:num(v.lng)};}
+function placeRow(v){
+  var r={name:v.name.trim(),category_id:v.cat,whatsapp:westernDigits(v.wa).replace(/\s/g,'')||null,prep_minutes:Math.round(num(v.prep)),lat:num(v.lat),lng:num(v.lng)};
+  var ph=westernDigits(v.phone||'').replace(/\s/g,'');
+  if(ph||window.__placeHasPhone)r.phone=ph||null;
+  return r;
+}
 function placeValidate(v){
   if(!v.name.trim())return 'اكتب اسم المحل أولًا';
   if(!v.cat)return 'اختر نوع المحل';
@@ -1724,6 +1792,25 @@ async function actEditProduct(){
     }});
   if(ok){toast('تم حفظ التعديل');render();}
 }
+async function actEditPrice(){
+  if(!await ensureOwner())return;
+  var p=cur.product;if(!p)return;
+  var ok=await formSheet({title:'سعر المنتج',text:'اتركه فارغًا لإظهار "لم يُحدَّد بعد". السعر يغيّره المالك فقط.',submit:'حفظ السعر',
+    fields:[{id:'price',label:'السعر بالجنيه',type:'text',inputmode:'decimal',value:p.price==null?'':arNum(p.price)}],
+    validate:function(v){return v.price.trim()&&num(v.price)===null?'اكتب السعر بالأرقام فقط':'';},
+    onSubmit:function(v){return upd('products',p.id,{price:v.price.trim()?num(v.price):null});}});
+  if(ok){toast('تم حفظ السعر');render();}
+}
+async function actEditShopNums(){
+  if(!await ensureOwner())return;
+  var pl=cur.place;if(!pl)return;
+  var ok=await formSheet({title:'أرقام المحل',text:'تظهر للعميل في صفحة المنتج، وتتركها فارغة لإخفائها.',submit:'حفظ الأرقام',
+    errText:function(er){return isDenied(er)?NOT_ALLOWED:(/phone|column/i.test(er.message||'')?'شغّل ملف SQL الخاص بالمرحلة ٢ أولًا':'تعذّر الحفظ الآن، جرّب مرة أخرى');},
+    fields:[{id:'wa',label:'رقم الواتس',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000',value:pl.whatsapp||''},{id:'ph',label:'رقم الاتصال',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000',value:pl.phone||''}],
+    validate:function(v){if(v.wa.trim()&&!validPhone(v.wa))return 'رقم الواتس غير صحيح';if(v.ph.trim()&&!validPhone(v.ph))return 'رقم الاتصال غير صحيح';return '';},
+    onSubmit:function(v){var c=function(x){return x.trim()?westernDigits(x).replace(/\s/g,''):null;};return upd('places',pl.id,{whatsapp:c(v.wa),phone:c(v.ph)});}});
+  if(ok){toast('تم حفظ الأرقام');render();}
+}
 async function actDelProduct(){
   if(!await ensureOwner())return;
   var p=cur.product;if(!p)return;
@@ -1732,20 +1819,14 @@ async function actDelProduct(){
 }
 async function addToCart(){
   var p=cur.product,pl=cur.place;if(!p||!pl)return;
-  if(cart&&cart.items.length&&cart.placeId!==pl.id){
-    if(!await confirmSheet('بدء طلب جديد','سلتك فيها منتجات من '+cart.placeName+'. الطلب الواحد يكون من محل واحد، فهل نبدأ طلبًا جديدًا؟','نعم، ابدأ طلبًا جديدًا',true))return;
-    cart=null;
-  }
-  if(!cart)cart={placeId:pl.id,placeName:pl.name,whatsapp:pl.whatsapp||'',prep:pl.prep_minutes,lat:pl.lat,lng:pl.lng,items:[]};
-  var it=null;cart.items.forEach(function(i){if(i.id===p.id)it=i;});
-  if(it)it.qty+=1;else cart.items.push({id:p.id,name:p.name,price:p.price==null?null:Number(p.price),qty:1});
-  saveCart();toast('أضفنا المنتج إلى طلبك');
+  addItemsToShop(pl,[{id:p.id,name:p.name,price:p.price==null?null:Number(p.price),qty:1}]);
+  saveCart();toast('أضفنا المنتج إلى سلتك');
 }
 function changeQty(id,d){
   if(!cart)return;
-  cart.items.forEach(function(i){if(i.id===id)i.qty+=d;});
-  cart.items=cart.items.filter(function(i){return i.qty>0});
-  if(!cart.items.length)cart=null;
+  cart.shops.forEach(function(sh){sh.items.forEach(function(i){if(i.id===id)i.qty+=d;});sh.items=sh.items.filter(function(i){return i.qty>0;});});
+  cart.shops=cart.shops.filter(function(sh){return sh.items.length>0;});
+  if(!cart.shops.length)cart=null;
   saveCart();render();
 }
 async function actLogout(){
@@ -1806,10 +1887,12 @@ document.addEventListener('click',function(e){
   else if(a==='login'||a==='ownerlogin'){loginSheet(a==='ownerlogin').then(function(ok){if(ok)checkAdmin().then(function(){toast('أهلًا بعودتك');render();});});}
   else if(a==='logout')actLogout();
   else if(a==='addcart')addToCart();
+  else if(a==='sendall')sendAllOrders();
+  else if(a==='editprice')actEditPrice();
+  else if(a==='editshopnums')actEditShopNums();
   else if(a==='qty')changeQty(id,+el.getAttribute('data-d'));
   else if(a==='clearcart'){confirmSheet('تفريغ السلة','هل تريد حذف كل منتجات طلبك الحالي؟','نعم، فرّغ السلة').then(function(ok){if(ok){cart=null;saveCart();render();}});}
   else if(a==='clearorders'){confirmSheet('مسح السجل','هل تريد مسح سجل طلباتك السابقة من هذا الجهاز؟','نعم، امسح').then(function(ok){if(ok){orders=[];lsSet(OKEY,orders);render();}});}
-  else if(a==='sendorder'){var ch=el.getAttribute('data-ch')||'whatsapp';setTimeout(function(){finalizeOrder(ch);},400);}
 });
 document.addEventListener('click',function(e){if(e.target.closest('#clr')){var q=$('q');q.value='';renderSugg();q.focus();}});
 
@@ -1822,7 +1905,7 @@ if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventLis
 updateBadge();
 setTimeout(checkFollowUp,3000);setInterval(checkFollowUp,300000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(checkFollowUp,800);});
-if(session)checkAdmin().then(function(){if(S.rideStaff)pollRidePrompt();}).catch(function(){});
+if(session)checkAdmin().then(function(){if(S.rideStaff)pollRidePrompt();if(S.shops.length)pollShopPrompt();}).catch(function(){});
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&session)refreshIfNeeded();});
 window.addEventListener('storage',function(e){if(e.key===SKEY){session=readStored();if(!session){S.isAdmin=false;render();}}});
 askLocation(); /* يُطلب إذن الموقع مباشرة عند فتح التطبيق */
