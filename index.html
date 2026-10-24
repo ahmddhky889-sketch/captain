@@ -589,7 +589,7 @@ function chip(ic,text,gold){return '<span class="chip'+(gold?' t':'')+'">'+icon(
 
 async function render(){
   var r=route(),tok=++renderTok;
-  var tabName=({home:'home',account:'account',taxonomy:'account',complaints:'account',ride:'home',rides:'account',ridestaff:'account',myprofile:'account',shoporders:'account',staff:'account',orders:'orders',community:'community'})[r.name];
+  var tabName=({home:'home',account:'account',taxonomy:'account',complaints:'account',ride:'home',rides:'account',ridestaff:'account',myprofile:'account',courier:'account',deliveries:'account',shoporders:'account',staff:'account',orders:'orders',community:'community'})[r.name];
   setActiveTab(tabName||'');
   if(r.name==='orders'){viewOrders();return;}
   if(r.name==='community'){viewCommunity();return;}
@@ -612,6 +612,8 @@ async function render(){
     else if(r.name==='rides')h=await viewRides();
     else if(r.name==='ridestaff')h=await viewRideStaff();
     else if(r.name==='myprofile')h=await viewMyProfile();
+    else if(r.name==='courier')h=await viewCourier();
+    else if(r.name==='deliveries')h=await viewDeliveries();
     else{location.hash='#/';return;}
   }catch(e){h={html:header('تعذّر التحميل','','#/')+'<div class="g">'+failedHtml()+'</div>'};}
   if(tok!==renderTok)return;
@@ -892,7 +894,9 @@ var ASKKEY='captain_asked';
 async function checkFollowUp(){
   if(!session||!session.user||$('scrim'))return;
   var rows;
-  try{rows=await sel('orders',{select:'id,place_name,created_at,eta_minutes,status',user_id:'eq.'+session.user.id,status:'in.(sent,received)',order:'created_at.desc',limit:'5'});}catch(e){return;}
+  try{rows=await sel('orders',{select:'id,place_name,created_at,eta_minutes,status,group_id',user_id:'eq.'+session.user.id,status:'in.(sent,received)',order:'created_at.desc',limit:'5'});}
+  catch(e){try{rows=await sel('orders',{select:'id,place_name,created_at,eta_minutes,status',user_id:'eq.'+session.user.id,status:'in.(sent,received)',order:'created_at.desc',limit:'5'});}catch(e2){return;}}
+  rows=(rows||[]).filter(function(o){return !o.group_id;}); /* سلات الدليفري يسأل عنها المنسّق بعد ٣٠ دقيقة */
   var asked=lsGet(ASKKEY,{}),now=Date.now();
   var due=(rows||[]).filter(function(o){var age=now-new Date(o.created_at).getTime();return age>=((o.eta_minutes||45)+15)*60000&&age<DAY&&!(asked[o.id]&&now-asked[o.id]<30*60000);})[0];
   if(!due||$('scrim'))return;
@@ -911,6 +915,8 @@ async function shopOrdersHtml(){
   var hd=header('الطلبات الواردة',S.shops.map(function(x){return x.name}).join('، '),'#/account');
   if(!S.shops.length)return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لأصحاب المحلات. اطلب من مالك التطبيق ربط حسابك بمحلك.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>',pending:0};
   var rows=await sel('orders',{select:'*',place_id:'in.('+S.shops.map(function(x){return x.id}).join(',')+')',order:'created_at.desc',limit:'60'})||[];
+  var dmap={};
+  try{var gs=rows.filter(function(o){return o.group_id;}).map(function(o){return o.group_id;});if(gs.length)(await sel('deliveries',{select:'group_id,accepted_by,accepted_name,accepted_phone',group_id:'in.('+gs.join(',')+')'})||[]).forEach(function(d){dmap[d.group_id]=d;});}catch(e){}
   var now=Date.now(),age=function(o){return now-new Date(o.created_at).getTime();};
   var fresh=rows.filter(function(o){return o.status==='sent'&&age(o)<DAY;});
   var going=rows.filter(function(o){return o.status==='received'&&age(o)<DAY;});
@@ -922,6 +928,7 @@ async function shopOrdersHtml(){
     return (o.customer_phone?'<a class="btn s" href="tel:'+esc(telOf(o.customer_phone))+'">'+icon('phone')+'اتصل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'?text='+encodeURIComponent(wmsg)+'">'+icon('chat')+'واتساب</a>':'')+(map?'<a class="btn s" target="_blank" rel="noopener" href="'+map+'">'+icon('pin')+'الموقع</a>':'');
   }
   function card(o,extra,btn){
+    var dd=dmap[o.group_id];if(dd&&dd.accepted_by)extra=(extra||'')+chip('car','الدليفري: '+(dd.accepted_name||'منسّق'),true)+(dd.accepted_phone?'<a class="chip t" href="tel:'+esc(telOf(dd.accepted_phone))+'">'+icon('phone')+'اتصل بالدليفري</a>':'');
     return '<section class="acc"><h2>'+esc(o.customer_name||'زبون')+'</h2><div class="chips">'+(o.customer_phone?chip('phone',arNum(o.customer_phone)):'')+(o.customer_email?chip('chat',o.customer_email):'')+chip('clock',dateAr(o.created_at))+chip('tag',arPrice(o.total),true)+(extra||'')+'</div><p>'+esc(o.items.map(function(i){return i.name+' × '+arNum(i.qty)}).join('، '))+'</p><div class="adm" style="padding-top:0">'+(btn||'')+contact(o)+'</div></section>';
   }
   var h=hd+'<div class="g">';
@@ -1177,6 +1184,198 @@ async function pollRidePrompt(){
 }
 setInterval(pollRidePrompt,10000);
 
+/* ===== المرحلة ٣: توصيل الدليفري (قبول المنسّق، سؤال العميل، التأخر) ===== */
+function timeAr(t){try{return new Date(t).toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'});}catch(e){return '';}}
+function isCourier(){return !!(S.coord&&(S.coord.kind==='delivery'||S.coord.kind==='both'));}
+function isoNow(){return new Date().toISOString();}
+function itemsText(o){return (o.items||[]).map(function(i){return i.name+' × '+arNum(i.qty)}).join('، ');}
+function closeDlvPrompt(){var sc=$('scrim');if(sc&&sc.getAttribute('data-dlv')){closeSheet();pending=null;}}
+
+/* ١) المنسّق: رسالة التوفر، وأول من يضغط يأخذ السلة */
+async function actDeliveryAccept(g){
+  try{
+    var r=await rpc('delivery_accept',{p_group:g});
+    closeDlvPrompt();
+    if(r==='ok'){toast('السلة لك الآن، تواصل مع العميل والمحلات');if(route().name==='courier')render();else location.hash='#/courier';}
+    else if(typeof r==='string'&&r.indexOf('taken:')===0)toast('قد وافق على الطلب قبلك '+(r.slice(6)||'منسّق آخر'));
+    else toast('انتهى وقت هذا الطلب');
+  }catch(e){closeDlvPrompt();toast(isDenied(e)?NOT_ALLOWED:'تعذّر قبول الطلب الآن، جرّب مرة أخرى');}
+}
+function showDeliveryPrompt(o){
+  var m=me();rideBeep();
+  var w=openSheet('<h2>هل أنت يا '+esc(m.name||'منسّق')+' متوفّر حاليًا؟</h2><p>طلب دليفري جديد من '+(o.shops_count>1?arNum(o.shops_count)+' محلات':'محل واحد')+'.</p><div class="acts"><button class="btn p block" id="dpAcc">اقبل الطلب</button><button class="btn s block" id="dpBusy">شوف غيري، أنا مشغول</button></div>');
+  w.setAttribute('data-dlv','1');
+  $('dpAcc').addEventListener('click',function(){actDeliveryAccept(o.group_id);});
+  $('dpBusy').addEventListener('click',function(){closeSheet();pending=null;toast('حاول تعجّل عشان محدش يسبقك');});
+}
+async function pollDeliveryPrompt(){
+  if(!session||!isCourier()||S.coord.status==='off'||document.hidden||$('scrim'))return;
+  try{
+    var rows=await rpc('delivery_open_list')||[];
+    var seen=lsGet('captain_dlv_seen',[]);if(!Array.isArray(seen))seen=[];
+    var o=rows.find(function(x){return seen.indexOf(x.group_id+':'+x.resent_count)<0;});
+    if(!o||$('scrim'))return;
+    seen.push(o.group_id+':'+o.resent_count);lsSet('captain_dlv_seen',seen.slice(-40));
+    showDeliveryPrompt(o);
+  }catch(e){}
+}
+setInterval(pollDeliveryPrompt,10000);
+
+/* ٢) المنسّق: سبب التأخر إجباري ولا تُغلق الرسالة إلا بالرد */
+function showDelayPrompt(d){
+  var m=me();rideBeep();
+  var w=openSheet('<h2>ما سبب تأخرك يا '+esc(m.name||'منسّق')+'؟</h2><p>العميل <b>'+esc(d.customer_name||'')+'</b> أبلغ أن طلبه لم يصل. اكتب السبب بوضوح ليراه مالك التطبيق.</p><form id="dlf" novalidate>'+fieldHtml({id:'dl',label:'سبب التأخر',type:'textarea',hint:'مثال: المحل تأخر في التجهيز'})+'<p class="note-warn" id="dlErr" hidden></p><button class="btn p block" type="submit" id="dlGo">إرسال السبب</button></form>');
+  var w2=w.cloneNode(true);w.parentNode.replaceChild(w2,w);
+  document.removeEventListener('keydown',escClose);pending=null;
+  w2.setAttribute('data-dlv','1');
+  var f=w2.querySelector('#dlf');
+  f.addEventListener('submit',async function(e){
+    e.preventDefault();
+    var t=w2.querySelector('#f_dl').value.trim(),er=w2.querySelector('#dlErr');
+    if(!t){er.textContent='اكتب سبب التأخر أولًا';er.hidden=false;return;}
+    w2.querySelector('#dlGo').disabled=true;
+    try{
+      var r=await rpc('delivery_reply_delay',{p_group:d.group_id,p_text:t});
+      if(r==='ok'||r==='no'){closeSheet();pending=null;toast('وصل ردك إلى المالك');if(route().name==='courier')render();}
+      else{er.textContent='اكتب سبب التأخر أولًا';er.hidden=false;w2.querySelector('#dlGo').disabled=false;}
+    }catch(x){er.textContent='تعذّر الإرسال الآن، جرّب مرة أخرى';er.hidden=false;w2.querySelector('#dlGo').disabled=false;}
+  });
+}
+async function pollDelayPrompt(){
+  if(!session||!isCourier()||document.hidden||$('scrim'))return;
+  try{
+    var rows=await sel('deliveries',{select:'group_id,customer_name,delay_asked_at',accepted_by:'eq.'+session.user.id,delay_asked_at:'not.is.null',delay_reply:'is.null',order:'delay_asked_at.asc',limit:'1'})||[];
+    if(rows[0]&&!$('scrim'))showDelayPrompt(rows[0]);
+  }catch(e){}
+}
+setInterval(pollDelayPrompt,10000);
+
+/* ٣) العميل: بعد ٣٠ دقيقة من قبول المنسّق "هل وصل الدليفري طلبك؟" */
+async function actDeliveryAnswer(g,v){
+  try{await rpc('delivery_answer',{p_group:g,p_arrived:v});toast(v?'يسعدنا أنه وصلك، شكرًا لك':'نعتذر عن التأخير، وسنتابع الأمر الآن');}
+  catch(e){toast('تعذّر إرسال إجابتك الآن، جرّب مرة أخرى');}
+  closeSheet();pending=null;
+  if(route().name==='orders')render();
+}
+async function pollCustomerDelivery(){
+  if(!session||!session.user||document.hidden||$('scrim'))return;
+  try{
+    var rows=await sel('deliveries',{select:'group_id,accepted_name,ask_at',user_id:'eq.'+session.user.id,accepted_by:'not.is.null',customer_answer:'is.null',ask_at:'lte.'+isoNow(),order:'ask_at.desc',limit:'3'})||[];
+    var asked=lsGet('captain_dlv_asked',{}),now=Date.now();
+    var d=rows.find(function(x){var age=now-new Date(x.ask_at).getTime();return age<DAY&&!(asked[x.group_id]&&now-asked[x.group_id]<30*60000);});
+    if(!d||$('scrim'))return;
+    asked[d.group_id]=now;lsSet('captain_dlv_asked',asked);
+    openSheet('<h2>هل وصل الدليفري طلبك؟</h2><p>'+(d.accepted_name?'المنسّق '+esc(d.accepted_name)+' يتولى توصيل طلبك. ':'')+'إجابتك تساعدنا أن نصلك أسرع.</p><div class="acts"><button class="btn p block" id="cdY" style="margin-top:12px">وصل، شكرًا</button><button class="btn s block" id="cdN">لم يصل بعد، شكرًا</button></div>',true);
+    $('cdY').addEventListener('click',function(){actDeliveryAnswer(d.group_id,true);});
+    $('cdN').addEventListener('click',function(){actDeliveryAnswer(d.group_id,false);});
+  }catch(e){}
+}
+setInterval(pollCustomerDelivery,30000);
+
+/* ٤) شاشة المنسّق: سلاته بكل تفاصيلها، وقسم التأخر */
+async function viewCourier(){
+  var hd=header('توصيلاتي','السلات التي قبلتها خلال آخر ٣ أيام','#/account');
+  if(session&&!S.coord)await checkAdmin();
+  if(!session||!isCourier())return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لمنسّقي الدليفري فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
+  var ds=await sel('deliveries',{select:'*',accepted_by:'eq.'+session.user.id,accepted_at:'gte.'+new Date(Date.now()-3*DAY).toISOString(),order:'accepted_at.desc',limit:'30'})||[];
+  var os=ds.length?(await sel('orders',{select:'*',group_id:'in.('+ds.map(function(d){return d.group_id}).join(',')+')',order:'created_at.asc'})||[]):[];
+  var now=Date.now();
+  var h=hd+'<div class="g">';
+  var delayed=ds.filter(function(d){return d.delay_asked_at&&now-new Date(d.delay_asked_at).getTime()<DAY;});
+  if(delayed.length){
+    h+='<div class="sec-head"><h2>التأخر</h2></div>';
+    delayed.forEach(function(d){h+='<section class="acc"><h2>'+esc(d.customer_name||'عميل')+'</h2><div class="chips">'+chip('clock','أبلغ بالتأخر '+timeAr(d.delay_asked_at),true)+'</div><p>'+(d.delay_reply?'ردّك: '+esc(d.delay_reply):'لم تردّ بعد، سبب التأخر مطلوب منك.')+'</p></section>';});
+  }
+  h+='<div class="sec-head"><h2>سلاتي</h2></div>';
+  if(!ds.length)h+='<div class="empty" style="padding-top:0">لا توجد سلات قبلتها بعد. تصلك رسالة هنا عندما يوجد طلب دليفري جديد وأنت فاتح التطبيق.</div>';
+  ds.forEach(function(d){
+    var mine=os.filter(function(o){return o.group_id===d.group_id;}),f=mine[0]||{};
+    var wa=waPhone(f.customer_phone),map=(f.customer_lat!=null&&f.customer_lng!=null)?'https://maps.google.com/?q='+f.customer_lat+','+f.customer_lng:'';
+    var st=d.customer_answer==='arrived'?chip('bag','وصل للعميل'):d.customer_answer==='not_arrived'?chip('clock','العميل أبلغ بالتأخر',true):chip('clock','نسأل العميل الساعة '+timeAr(d.ask_at));
+    h+='<section class="acc"><h2>'+esc(d.customer_name||'عميل')+'</h2><div class="chips">'+(f.customer_phone?chip('phone',arNum(f.customer_phone)):'')+chip('clock','قبلتها '+timeAr(d.accepted_at))+st+'</div>'+
+      '<div class="adm" style="padding-top:0">'+(f.customer_phone?'<a class="btn s" href="tel:'+esc(telOf(f.customer_phone))+'">'+icon('phone')+'اتصل بالعميل</a>':'')+(wa?'<a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+wa+'">'+icon('chat')+'واتساب</a>':'')+(map?'<a class="btn s" target="_blank" rel="noopener" href="'+esc(map)+'">'+icon('pin')+'موقع العميل</a>':'')+'</div>';
+    mine.forEach(function(o){
+      var sw=waPhone(o.place_whatsapp);
+      h+='<div class="card" style="flex-direction:column;gap:6px;align-items:flex-start;margin-top:8px"><span class="nm" style="font-weight:700">'+esc(o.place_name)+'</span><span class="sc" style="font-size:12px;color:var(--fg-2)">'+esc(itemsText(o))+' — '+arPrice(o.total)+'</span>'+
+        (sw?'<div class="adm" style="padding:0"><a class="btn s" href="tel:'+esc(telOf(o.place_whatsapp))+'">'+icon('phone')+'اتصل بالمحل</a><a class="btn s" target="_blank" rel="noopener" href="https://wa.me/'+sw+'">'+icon('chat')+'واتساب المحل</a></div>':'')+'</div>';
+    });
+    h+='</section>';
+  });
+  return{html:h+'</div>'};
+}
+
+/* ٥) شاشة المالك: كل التوصيلات، إعادة الإرسال، سحب السلة، المعالجة */
+function lastDlvWord(d){
+  var now=Date.now();
+  if(d.customer_answer==='arrived')return chip('bag','وصل للعميل');
+  if(d.accepted_by)return chip('car','مع '+(d.accepted_name||'منسّق'),true);
+  if(new Date(d.open_until).getTime()>now)return chip('clock','بانتظار قبول منسّق حتى '+timeAr(d.open_until));
+  return chip('clock','انتهى الوقت بدون قبول',true);
+}
+async function viewDeliveries(){
+  var hd=header('متابعة الدليفري','كل سلة وصلت: من قبلها وهل وصلت','#/account');
+  if(!session||!(S.isAdmin||await checkAdmin()))return{html:hd+'<div class="g"><div class="empty">هذه الشاشة لمالك التطبيق فقط.<br><br><a class="btn s" href="#/account">رجوع إلى حسابي</a></div></div>'};
+  var rows=await sel('deliveries',{select:'*',order:'created_at.desc',limit:'80'})||[];
+  var now=Date.now(),old=rows.filter(function(d){return now-new Date(d.created_at).getTime()>3*DAY;}),cur=rows.filter(function(d){return old.indexOf(d)<0;});
+  var h=hd+'<div class="g">';
+  if(old.length)h+='<div class="adm"><button class="btn d" data-act="purgedlv">'+icon('trash')+'مسح التوصيلات الأقدم من ٣ أيام ('+arNum(old.length)+')</button></div>';
+  if(!cur.length)h+='<div class="empty">لا توجد توصيلات حديثة.</div>';
+  cur.forEach(function(d){
+    var late=d.customer_answer==='not_arrived'&&!d.owner_handled;
+    h+='<section class="acc" style="margin-top:12px"><h2>'+esc(d.customer_name||'عميل')+'</h2><div class="chips">'+chip('bag',arNum(d.shops_count)+(d.shops_count===1?' محل':' محلات'))+chip('clock',timeAr(d.created_at))+lastDlvWord(d)+(late?chip('clock','أبلغ بالتأخر',true):'')+'</div>'+
+      (d.delay_asked_at?'<p>'+(d.delay_reply?'سبب التأخر من المنسّق: '+esc(d.delay_reply):'المنسّق لم يردّ على سبب التأخر بعد.')+'</p>':'')+
+      '<div class="adm" style="padding-top:0">'+
+      (d.accepted_by?(d.accepted_phone?'<a class="btn s" href="tel:'+esc(telOf(d.accepted_phone))+'">'+icon('phone')+'اتصل بالمنسّق</a>':'')+(d.customer_answer!=='arrived'?'<button class="btn d" data-act="dlvrelease" data-id="'+esc(d.group_id)+'">سحب السلة وإعادة إرسالها</button>':''):
+        '<button class="btn p" data-act="dlvresend" data-id="'+esc(d.group_id)+'">إعادة إرسال لـ ٥ دقائق</button>')+
+      (late?'<button class="btn s" data-act="dlvhandled" data-id="'+esc(d.group_id)+'">تمت المتابعة</button>':'')+'</div></section>';
+  });
+  return{html:h+'</div>'};
+}
+async function actDlvResend(g){
+  try{var r=await rpc('delivery_resend',{p_group:g});toast(r==='ok'?'أُعيد إرسال السلة للمنسّقين لمدة ٥ دقائق':'السلة قبلها منسّق بالفعل');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الإرسال الآن، جرّب مرة أخرى');}
+  render();
+}
+async function actDlvRelease(g){
+  if(!await confirmSheet('سحب السلة','سنسحب السلة من المنسّق الحالي ونرسلها لباقي المنسّقين لمدة ٥ دقائق.','نعم، اسحبها'))return;
+  try{var r=await rpc('delivery_release',{p_group:g});toast(r==='ok'?'سُحبت السلة وأُعيد إرسالها':'لا يمكن سحب هذه السلة');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر السحب الآن، جرّب مرة أخرى');}
+  render();
+}
+async function actDlvHandled(g){
+  try{await api('PATCH','/rest/v1/deliveries?group_id=eq.'+encodeURIComponent(g),{json:{owner_handled:true},headers:{'Prefer':'return=minimal'}});toast('تم تسجيل المتابعة');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر الحفظ الآن، جرّب مرة أخرى');}
+  render();
+}
+async function actPurgeDlv(){
+  if(!await confirmSheet('مسح القديم','سنمسح سجلات التوصيل الأقدم من ٣ أيام نهائيًا.','نعم، امسحها'))return;
+  try{await api('DELETE','/rest/v1/deliveries?created_at=lt.'+encodeURIComponent(new Date(Date.now()-3*DAY).toISOString()),{headers:{'Prefer':'return=minimal'}});toast('تم المسح');}
+  catch(e){toast(isDenied(e)?NOT_ALLOWED:'تعذّر المسح الآن، جرّب مرة أخرى');}
+  render();
+}
+/* تنبيهات المالك: عميل أبلغ بالتأخر، أو سلة انتهى وقتها بدون قبول */
+async function pollOwnerDelivery(){
+  if(!session||!S.isAdmin||document.hidden||$('scrim'))return;
+  try{
+    var seen=lsGet('captain_dlv_owner_seen',[]);if(!Array.isArray(seen))seen=[];
+    var late=(await sel('deliveries',{select:'group_id,customer_name,answered_at',customer_answer:'eq.not_arrived',owner_handled:'eq.false',order:'answered_at.desc',limit:'5'})||[]).find(function(x){return seen.indexOf('L'+x.group_id)<0;});
+    var d=late,key=late&&'L'+late.group_id,msg;
+    if(late)msg='<h2>العميل '+esc(late.customer_name||'')+' تأخر عنه الأوردر</h2><p>اكتشف سبب التأخير أيها الأمير.</p>';
+    else{
+      var ex=(await sel('deliveries',{select:'group_id,customer_name,resent_count',accepted_by:'is.null',open_until:'lt.'+isoNow(),created_at:'gte.'+new Date(Date.now()-3*3600000).toISOString(),order:'created_at.desc',limit:'5'})||[]).find(function(x){return seen.indexOf('X'+x.group_id+':'+x.resent_count)<0;});
+      if(!ex)return;d=ex;key='X'+ex.group_id+':'+ex.resent_count;
+      msg='<h2>لم يقبل أي منسّق سلة '+esc(ex.customer_name||'عميل')+'</h2><p>يمكنك إعادة إرسالها لمدة ٥ دقائق من شاشة المتابعة.</p>';
+    }
+    if($('scrim'))return;
+    seen.push(key);lsSet('captain_dlv_owner_seen',seen.slice(-60));
+    rideBeep();
+    openSheet(msg+'<div class="acts"><button class="btn p block" id="odOpen">افتح متابعة الدليفري</button><button class="btn s block" id="odLater">لاحقًا</button></div>',true);
+    $('odOpen').addEventListener('click',function(){closeSheet();pending=null;location.hash='#/deliveries';if(route().name==='deliveries')render();});
+    $('odLater').addEventListener('click',function(){closeSheet();pending=null;});
+  }catch(e){}
+}
+setInterval(pollOwnerDelivery,20000);
+
 /* ===== المنسّقون (للمالك) وملف المنسّق ===== */
 var KINDS={rides:'مشاوير',delivery:'دليفري',both:'مشاوير ودليفري'};
 var STATUSES={available:'متاح',busy:'مشغول',off:'غير متاح اليوم'};
@@ -1358,6 +1557,8 @@ async function viewAccount(){
     if(S.isAdmin)h+='<div class="acc"><h2>أنت مسجّل كمالك</h2><p>يمكنك إضافة المحلات والأقسام والمنتجات وتعديلها من شاشاتها مباشرة.</p><a class="btn s block" href="#/taxonomy">'+icon('tag')+'إدارة الأصناف والفئات</a><a class="btn s block" href="#/complaints">'+icon('bag')+'طلبات تحتاج متابعة</a><a class="btn s block" href="#/staff">'+icon('user')+'حسابات المحلات</a><a class="btn s block" href="#/rides">'+icon('car')+'طلبات المشاوير</a><a class="btn s block" href="#/ridestaff">'+icon('user')+'المنسّقون</a></div>';
     if(S.coord)h+='<div class="acc"><h2>أنت منسّق</h2><div class="chips">'+chip('car','شغلك: '+(KINDS[S.coord.kind]||S.coord.kind),true)+chip('clock','حالتك: '+(STATUSES[S.coord.status]||''))+'</div><a class="btn s block" href="#/myprofile">'+icon('user')+'ملفي كمنسّق</a>'+(S.rideStaff?'<p>تصلك هنا طلبات المشاوير، وتتواصل مع الراكب لتتفقا على السعر.</p><a class="btn p block" href="#/rides">'+icon('car')+'طلبات المشاوير</a>':'')+'</div>';
     if(S.shops.length)h+='<div class="acc"><h2>حساب محل</h2><div class="chips">'+S.shops.map(function(x){return chip('tag',x.name,true)}).join('')+'</div><p>تصلك هنا طلبات محلك، وتؤكد استلامها بضغطة واحدة.</p><a class="btn p block" href="#/shoporders">'+icon('bag')+'الطلبات الواردة</a></div>';
+    if(isCourier())h+='<div class="acc"><h2>توصيلات الدليفري</h2><p>تصلك هنا رسالة عندما يوجد طلب دليفري جديد وأنت فاتح التطبيق.</p><a class="btn p block" href="#/courier">'+icon('car')+'توصيلاتي</a></div>';
+    if(S.isAdmin)h+='<div class="acc"><h2>متابعة الدليفري</h2><p>شاهد من قبل كل سلة، وأعد إرسالها أو اسحبها.</p><a class="btn s block" href="#/deliveries">'+icon('car')+'متابعة الدليفري</a></div>';
     h+='<form class="acc" id="naf" novalidate><h2>إنشاء حساب جديد</h2><p>حسابك الحالي يبقى محفوظًا على هذا الجهاز، وتقدر تبدّل بينهم في أي وقت.</p>'+
       fieldHtml({id:'nname',label:'الاسم',type:'text'})+fieldHtml({id:'nphone',label:'رقم الموبايل (اختياري)',type:'text',inputmode:'tel',ltr:true,hint:'+201000000000'})+fieldHtml({id:'nem',label:'البريد الإلكتروني',type:'email',ltr:true})+fieldHtml({id:'npw',label:'كلمة المرور (٦ أحرف على الأقل)',type:'password',ltr:true})+
       '<button class="btn p block" type="submit" id="naGo">'+icon('plus')+'إنشاء حساب جديد</button></form>';
@@ -1874,6 +2075,10 @@ document.addEventListener('click',function(e){
   else if(a==='rmridestaff')actRmRideStaff(id);
   else if(a==='coordkind')actCoordKind(id,el.getAttribute('data-kind'));
   else if(a==='coordstatus')actCoordStatus(id);
+  else if(a==='dlvresend')actDlvResend(id);
+  else if(a==='dlvrelease')actDlvRelease(id);
+  else if(a==='dlvhandled')actDlvHandled(id);
+  else if(a==='purgedlv')actPurgeDlv();
   else if(a==='coordphoto')actCoordPhoto();
   else if(a==='coordphotodel')actCoordPhotoDel();
   else if(a==='addstaff')actAddStaff();
@@ -1905,7 +2110,7 @@ if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventLis
 updateBadge();
 setTimeout(checkFollowUp,3000);setInterval(checkFollowUp,300000);
 document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(checkFollowUp,800);});
-if(session)checkAdmin().then(function(){if(S.rideStaff)pollRidePrompt();if(S.shops.length)pollShopPrompt();}).catch(function(){});
+if(session)checkAdmin().then(function(){if(S.rideStaff)pollRidePrompt();if(S.shops.length)pollShopPrompt();pollDeliveryPrompt();pollDelayPrompt();pollOwnerDelivery();}).catch(function(){});
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&session)refreshIfNeeded();});
 window.addEventListener('storage',function(e){if(e.key===SKEY){session=readStored();if(!session){S.isAdmin=false;render();}}});
 askLocation(); /* يُطلب إذن الموقع مباشرة عند فتح التطبيق */
